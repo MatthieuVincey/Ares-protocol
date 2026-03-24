@@ -1420,7 +1420,7 @@
             return ry;
         }
 
-        const CHUNK = 64, RES = 32, RD = 3;
+        const CHUNK = 64, RES = 48, RD = 3; // Increased resolution for smoother geometry
         const chunks = new Map();
 
         // --- Reverted Terrain Material (Original style) ---
@@ -1428,7 +1428,7 @@
             vertexColors: THREE.VertexColors,
             roughness: 0.85,
             metalness: 0.1,
-            flatShading: true
+            flatShading: false // Smooth shading enabled
         });
 
         // --- GLOBAL WATER SYSTEM ---
