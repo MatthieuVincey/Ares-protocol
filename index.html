@@ -1027,6 +1027,9 @@
         <button class="close-btn" id="map-close">FERMER</button>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- MULTIPLAYER CORE ARCHITECTURE -->
+    <script src="multiplayerSystem.js"></script>
+    
     <script src="livingPlanetSystem.js?v=v7_neutral_grey"></script>
     <script src="energySystem.js?v=2"></script>
     <script src="progressionSystem.js?v=2"></script>
@@ -1181,9 +1184,19 @@
         };
 
         // ============================================================
-        //  Game State
+        //  Game State (Bridged to GameState for incremental refactor)
         // ============================================================
-        window.state = {
+        window.state = window.GameState; // Bridge mapping
+
+        // Temporary shim to keep legacy 'state.player' working until fully refactored
+        // We link state.player directly to the local player instance
+        window.state.player = window.GameState.players[window.localPlayerId];
+        window.state.terra = window.GameState.world;
+        window.state.buildings = []; // Legacy array, will be refactored to GameState.machines
+        window.state.resources = []; // Legacy array, will be refactored to GameState.resources
+        
+        // Ensure upgrades are present (multiplayerSystem.js has them)
+        Object.assign(window.state, {
             player: {
                 o2: 100, hp: 100, energy: 100, inventory: {
                     // Base metals
@@ -1230,7 +1243,7 @@
             energySystem: null,
             progressionSystem: null,
             planetSystem: null
-        };
+        });
 
         const UPGRADE_DATA = {
             jetpack_tank: {
@@ -1571,8 +1584,21 @@
                 m.position.set(rx, ry + d.size / 2, rz);
                 m.userData = { type: 'resource', rtype: type };
                 m.castShadow = true; m.receiveShadow = true;
+                
+                const resourceId = "res_" + Math.random().toString(36).substr(2, 9);
+                m.userData.resourceId = resourceId;
+                
                 scene.add(m);
                 state.resources.push(m);
+                
+                // ACTION: Register in GameState
+                window.sendAction({
+                    type: 'SPAWN_RESOURCE',
+                    resourceId: resourceId,
+                    resourceType: type,
+                    position: { x: rx, y: ry + d.size / 2, z: rz },
+                    quantity: 1
+                });
             } catch (e) { }
         }
 
@@ -1662,6 +1688,16 @@
             // Add to buildings to flatten terrain around it
             g.userData = { btype: 'capsule' }; // Special case for larger flattening
             state.buildings.push(g);
+            
+            // ACTION: Register in GameState
+            window.sendAction({
+                type: 'PLACE_MACHINE',
+                machineId: 'capsule_0',
+                machineType: 'capsule',
+                position: { x: g.position.x, y: g.position.y, z: g.position.z },
+                rotationY: g.rotation.y,
+                playerId: window.localPlayerId
+            });
 
             // Start resources around capsule
             const types = Object.keys(RESOURCE_TYPES);
@@ -2301,8 +2337,22 @@
             mesh.position.copy(ghostMesh.position);
             if (!mesh.userData) mesh.userData = {};
             mesh.userData.btype = type;
+            
+            const machineId = "mach_" + Math.random().toString(36).substr(2, 9);
+            mesh.userData.machineId = machineId;
+            
             scene.add(mesh);
             state.buildings.push(mesh);
+            
+            // ACTION: Register in GameState
+            window.sendAction({
+                type: 'PLACE_MACHINE',
+                machineId: machineId,
+                machineType: type,
+                position: { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z },
+                rotationY: mesh.rotation.y,
+                playerId: window.localPlayerId
+            });
 
             if (d.isModule) {
                 updateTerrainUnderBuilding(mesh);
@@ -2952,9 +3002,18 @@
             if (hits.length > 0 && hits[0].distance < pickupDist) {
                 const obj = hits[0].object;
                 const type = obj.userData.rtype;
-                state.player.inventory[type] = (state.player.inventory[type] || 0) + 1;
+                
                 scene.remove(obj);
                 state.resources.splice(state.resources.indexOf(obj), 1);
+                
+                // ACTION: Collect Resource
+                window.sendAction({
+                    type: 'COLLECT_RESOURCE',
+                    playerId: window.localPlayerId,
+                    resourceId: obj.userData.resourceId,
+                    amount: 1
+                });
+                
                 updateInvUI();
                 showMsg(`+ 1 ${type}`);
 
@@ -3462,19 +3521,15 @@
         state.yaw = Math.PI;
         state.pitch = -0.15;
 
-        function loop() {
-            try {
-                requestAnimationFrame(loop);
-                const dt = Math.min(clock.getDelta(), 0.05);
+        function updateGame(dt) {
+            // Update camera even if not started to avoid initial black screen
+            if (state.player && !state.player.inRover) {
+                camera.rotation.y = state.yaw;
+                camera.rotation.x = state.pitch + (state.physics ? state.physics.landingImpact : 0);
+                camera.position.copy(state.player.pos);
+            }
 
-                // Update camera even if not started to avoid initial black screen
-                if (state.player && !state.player.inRover) {
-                    camera.rotation.y = state.yaw;
-                    camera.rotation.x = state.pitch + (state.physics ? state.physics.landingImpact : 0);
-                    camera.position.copy(state.player.pos);
-                }
-
-                if (!state.started) { renderer.render(scene, camera); return; }
+            if (!state.started) return;
 
                 // --- Update chunks & Discovery ---
                 const now = performance.now();
@@ -3686,26 +3741,43 @@
                     const actualSlopeDist = Math.sqrt(distMoved * distMoved + nextRise * nextRise);
                     const actualSlopeCos = distMoved > 0 ? distMoved / actualSlopeDist : 1;
 
+                    let targetPosX = state.player.pos.x;
+                    let targetPosZ = state.player.pos.z;
                     // Block X/Z if it's a sheer cliff AND our feet are below the top of the cliff
                     if (nextRise > MAX_STEP_HEIGHT && actualSlopeCos < MAX_SLOPE_COS && feetY < nextGroundY - MAX_STEP_HEIGHT) {
                         // Bounce off cliff
                         ph.velX *= 0.5;
                         ph.velZ *= 0.5;
                     } else {
-                        state.player.pos.x = nextX;
-                        state.player.pos.z = nextZ;
+                        targetPosX = nextX;
+                        targetPosZ = nextZ;
                     }
 
-                    state.player.pos.y += ph.velY * dt;
+                    let targetPosY = state.player.pos.y + ph.velY * dt;
 
                     // 7. Clamp feet to ground
-                    const newGroundY = getTerrainY(state.player.pos.x, state.player.pos.z);
-                    const newFeetY = state.player.pos.y - PLAYER_HEIGHT;
+                    const newGroundY = getTerrainY(targetPosX, targetPosZ);
+                    const newFeetY = targetPosY - PLAYER_HEIGHT;
                     if (newFeetY < newGroundY) {
-                        state.player.pos.y = newGroundY + PLAYER_HEIGHT;
+                        targetPosY = newGroundY + PLAYER_HEIGHT;
                         if (ph.velY < 0) ph.velY = 0;
                         ph.isGrounded = true;
                     }
+                    
+                    // 7.5 Dispatch Action
+                    let playerStateString = 'idle';
+                    if (!ph.isGrounded) playerStateString = 'jetpack';
+                    else if (ph.velX !== 0 || ph.velZ !== 0) playerStateString = (state.keys['ShiftLeft'] || state.keys['ShiftRight']) ? 'running' : 'walking';
+
+                    window.sendAction({
+                        type: 'PLAYER_MOVE',
+                        playerId: window.localPlayerId,
+                        position: { x: targetPosX, y: targetPosY, z: targetPosZ },
+                        rotation: { y: state.yaw },
+                        velocity: { x: ph.velX, y: ph.velY, z: ph.velZ },
+                        state: playerStateString,
+                        jetpackFuel: state.player.jetpack.fuel
+                    });
 
                     // 8. Landing impact decay + camera
                     if (ph.landingImpact > 0) {
@@ -3719,14 +3791,28 @@
                 // --- Stats ---
                 const distFromCenter = Math.sqrt(state.player.pos.x ** 2 + state.player.pos.z ** 2);
                 const atCapsule = distFromCenter < 12; // Increased radius for comfort
+                
+                let targetO2 = state.player.o2;
+                let targetHp = state.player.hp;
+                
                 if (atCapsule) {
-                    state.player.o2 = Math.min(100, state.player.o2 + dt * 25);
+                    targetO2 = Math.min(100, targetO2 + dt * 25);
                 } else {
-                    state.player.o2 -= dt * 0.3; // Reduced drain (0.3 instead of 0.8)
+                    targetO2 -= dt * 0.3; // Reduced drain (0.3 instead of 0.8)
                 }
-                if (state.player.o2 <= 0) state.player.hp -= dt * 1.5;
-                state.player.o2 = Math.max(0, state.player.o2);
-                state.player.hp = Math.min(100, state.player.hp);
+                if (targetO2 <= 0) targetHp -= dt * 1.5;
+                
+                targetO2 = Math.max(0, targetO2);
+                targetHp = Math.min(100, targetHp);
+                
+                if (targetO2 !== state.player.o2 || targetHp !== state.player.hp) {
+                    window.sendAction({
+                        type: 'UPDATE_PLAYER_STATS',
+                        playerId: window.localPlayerId,
+                        o2: targetO2,
+                        hp: targetHp
+                    });
+                }
 
                 // --- Automated Extraction & Drones ---
                 updateExtraction(dt);
@@ -3804,38 +3890,47 @@
                 updateInteraction();
                 updateLabProximity();
                 updateHUD();
+        }
 
-                // 8. Visual Animations (Pulsing LEDs, Oscillations)
-                const time = Date.now() * 0.001;
-                state.buildings.forEach(b => {
-                    if (b.userData.btype && b.userData.btype.includes('drill')) {
-                        // Oscillator for drills
-                        const drill = b.children.find(c => c.geometry && c.geometry.type === 'CylinderGeometry');
-                        if (drill) drill.position.y = 1 + Math.sin(time * 5) * 0.2;
-                    }
-                    // LED pulsing
-                    b.traverse(c => {
-                        if (c.material && c.material.type === 'MeshBasicMaterial') {
-                            c.material.opacity = 0.6 + Math.sin(time * 8) * 0.4;
+        function renderGame() {
+            if (!state.started) {
+                renderer.render(scene, camera);
+                return;
+            }
+
+            // 8. Visual Animations (Pulsing LEDs, Oscillations)
+            const time = Date.now() * 0.001;
+            state.buildings.forEach(b => {
+                if (b.userData.btype && b.userData.btype.includes('drill')) {
+                    const drill = b.children.find(c => c.geometry && c.geometry.type === 'CylinderGeometry');
+                    if (drill) drill.position.y = 1 + Math.sin(time * 5) * 0.2;
+                }
+                b.traverse(c => {
+                    if (c.material && c.material.type === 'MeshBasicMaterial') c.material.opacity = 0.6 + Math.sin(time * 8) * 0.4;
+                });
+                if (b.userData.isMonument) {
+                    b.children.forEach(c => {
+                        if (c.geometry && c.geometry.type === 'TorusGeometry') {
+                            if (c.rotation.x !== 0) c.rotation.z += 0.02;
+                            if (c.rotation.y !== 0) c.rotation.z -= 0.01;
                         }
                     });
+                }
+            });
 
-                    // Special Monument Animation
-                    if (b.userData.isMonument) {
-                        b.children.forEach(c => {
-                            if (c.geometry && c.geometry.type === 'TorusGeometry') {
-                                if (c.rotation.x !== 0) c.rotation.z += 0.02; // ring1
-                                if (c.rotation.y !== 0) c.rotation.z -= 0.01; // ring2
-                            }
-                        });
-                    }
-                });
+            // 9. Update clouds visual spin
+            if (typeof updateClouds === 'function') updateClouds(0.016);
 
-                // 9. Update clouds
-                if (typeof updateClouds === 'function') updateClouds(dt);
+            renderer.render(scene, camera);
+            if (!window._initLog) { console.log("✅ ARES LOOP ACTIVE - Rendering Scene"); window._initLog = true; }
+        }
 
-                renderer.render(scene, camera);
-                if (!window._initLog) { console.log("✅ ARES LOOP ACTIVE - Rendering Scene"); window._initLog = true; }
+        function loop() {
+            try {
+                requestAnimationFrame(loop);
+                const dt = Math.min(clock.getDelta(), 0.05);
+                updateGame(dt);
+                renderGame();
             } catch (err) {
                 console.error("🚀 ARES PROTOCOL Loop Crash Prevented:", err);
             }
