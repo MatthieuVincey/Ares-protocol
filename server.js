@@ -14,30 +14,45 @@ const biomeSystem = new BiomeSystem(42); // Fixed seed for multiplayer
 // 1.5. Authoritative World Seeding
 function seedWorld() {
     console.log("[WORLD] Seeding authoritative resources...");
-    const clusterCount = 150;
+    
+    // Spawn 20 resources right near the start (0,0)
+    for (let i = 0; i < 20; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 5 + Math.random() * 25;
+        const rx = Math.cos(angle) * dist;
+        const rz = Math.sin(angle) * dist;
+        spawnSingleResource(rx, rz);
+    }
+
+    // Spawn 500 resources globally
+    const clusterCount = 500;
     for (let i = 0; i < clusterCount; i++) {
         const rx = (Math.random() - 0.5) * 1600;
         const rz = (Math.random() - 0.5) * 1600;
-        
-        const biomeId = biomeSystem.getBiomeIdentifier(rx, rz);
-        const biome = BIOMES[biomeId];
-        const resourceType = biome.resources[Math.floor(Math.random() * biome.resources.length)];
-        
-        const ry = biomeSystem.getElevation(rx, rz);
-        const resourceId = "res_srv_" + Math.random().toString(36).substr(2, 8);
-        
-        // Size offset (assuming default 0.4 roughly)
-        const finalY = ry + 0.2; 
-
-        applyAction({
-            type: 'SPAWN_RESOURCE',
-            resourceId: resourceId,
-            resourceType: resourceType,
-            position: { x: rx, y: finalY, z: rz },
-            quantity: 1
-        });
+        spawnSingleResource(rx, rz);
     }
+    
     console.log(`[WORLD] Seeded ${Object.keys(GameState.resources).length} resources.`);
+}
+
+function spawnSingleResource(rx, rz) {
+    const biomeId = biomeSystem.getBiomeIdentifier(rx, rz);
+    const biome = BIOMES[biomeId];
+    const resourceType = biome.resources[Math.floor(Math.random() * biome.resources.length)];
+    
+    const ry = biomeSystem.getElevation(rx, rz);
+    const resourceId = "res_srv_" + Math.random().toString(36).substr(2, 8);
+    
+    // Initial Y offset for server physics (clamped fully on client anyway)
+    const finalY = ry + 0.2; 
+
+    applyAction({
+        type: 'SPAWN_RESOURCE',
+        resourceId: resourceId,
+        resourceType: resourceType,
+        position: { x: rx, y: finalY, z: rz },
+        quantity: 1
+    });
 }
 
 seedWorld();

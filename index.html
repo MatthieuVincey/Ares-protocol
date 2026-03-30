@@ -1592,7 +1592,11 @@
                 });
                 const geo = new THREE.BoxGeometry(d.size, d.size, d.size);
                 const m = new THREE.Mesh(geo, mat);
-                m.position.set(rx, ry, rz); // ry is already offset on server
+                
+                // --- FIXED Y-COORDINATE (Snap to terrain) ---
+                const surfaceY = typeof getTerrainY === 'function' ? getTerrainY(rx, rz) : ry;
+                m.position.set(rx, Math.max(ry, surfaceY + d.size/2), rz);
+                
                 m.userData = { type: 'resource', rtype: type, resourceId: resourceId };
                 m.castShadow = true; m.receiveShadow = true;
                 
