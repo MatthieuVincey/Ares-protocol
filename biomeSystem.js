@@ -100,12 +100,17 @@ const BIOMES = {
 };
 
 class BiomeSystem {
-    constructor() {
+    constructor(seed = 42) {
         this.biomes = Object.values(BIOMES);
-        this.tOffset = Math.random() * 10000;
-        this.hOffset = Math.random() * 10000;
-        this.wOffset = Math.random() * 10000;
-        this.cOffset = Math.random() * 10000; // Continental Scale
+        // Use a fixed seed or seeded random for multiplayer consistency
+        const seededRandom = (s) => {
+            const x = Math.sin(s) * 10000;
+            return x - Math.floor(x);
+        };
+        this.tOffset = seededRandom(seed + 1) * 10000;
+        this.hOffset = seededRandom(seed + 2) * 10000;
+        this.wOffset = seededRandom(seed + 3) * 10000;
+        this.cOffset = seededRandom(seed + 4) * 10000; // Continental Scale
     }
 
     hash(ix, iz) {
@@ -187,4 +192,8 @@ class BiomeSystem {
 if (typeof window !== 'undefined') {
     window.BiomeSystem = BiomeSystem;
     window.BIOMES = BIOMES;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { BiomeSystem, BIOMES };
 }

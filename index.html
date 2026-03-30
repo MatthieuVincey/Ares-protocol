@@ -873,8 +873,17 @@
         <div id="tech-panel-body"></div>
         <button class="close-btn" id="tech-close" style="margin-top:16px">FERMER [T]</button>
     </div>
-
     <div id="hud">
+        <!-- Server Diagnostics -->
+        <div id="server-diag" style="position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.8); color:#00ff00; padding:10px; font-family:monospace; border:1px solid #00ff00; z-index:100; font-size:12px; pointer-events:auto; text-shadow:none;">
+            <h3 style="margin:0 0 5px 0; border-bottom:1px solid #00ff00; padding-bottom:3px;">Diagnostics Serveur</h3>
+            <div id="diag-players">Players: 0</div>
+            <div id="diag-machines">Machines: 0</div>
+            <div id="diag-resources">Resources: 0</div>
+            <div id="diag-status" style="color:lime; margin-top:3px;">Status: WAITING</div>
+            <button id="btn-spawn-bots" style="margin-top:8px; width:100%; border-radius:2px; background:#005500; color:white; border:1px solid #00ff00; cursor:pointer;">Spawn 5 Bots</button>
+        </div>
+
         <!-- Biome Info -->
         <div id="biome-info">
             <div id="biome-name">Plaines Rocheuses</div>
@@ -1027,15 +1036,18 @@
         <button class="close-btn" id="map-close">FERMER</button>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/math/ImprovedNoise.js"></script>
     <!-- MULTIPLAYER CORE ARCHITECTURE -->
+    <script src="biomeSystem.js?v=v7_neutral_grey"></script>
     <script src="multiplayerSystem.js"></script>
-    
+    <script src="networkSystem.js"></script>
+
     <script src="livingPlanetSystem.js?v=v7_neutral_grey"></script>
     <script src="energySystem.js?v=2"></script>
     <script src="progressionSystem.js?v=2"></script>
-    <script src="biomeSystem.js?v=v7_neutral_grey"></script>
     <script src="droneSystem.js"></script>
     <script src="roverSystem.js"></script>
+    <script src="botSystem.js"></script>
     <script>
         // Standard initialization that works with file:// protocol
         (function initRoverSystem() {
@@ -1052,6 +1064,20 @@
         // ============================================================
         //  ARES PROTOCOL — Main Game Script
         // ============================================================
+
+        // --- FATAL ERROR TRAP ---
+        window.onerror = function(msg, url, line, col, error) {
+            const eDiv = document.createElement('div');
+            eDiv.style.cssText = 'position:fixed;top:5%;left:5%;right:5%;background:#800;color:#fff;padding:20px;border:4px solid #f00;z-index:99999;font-family:monospace;white-space:pre-wrap;';
+            eDiv.innerText = `FATAL SCRIPT ERROR:\n${msg}\nLine: ${line}:${col}\nSource: ${url.split('/').pop()}\n\nStack:\n${error ? error.stack : 'N/A'}`;
+            document.body.appendChild(eDiv);
+            return false;
+        };
+
+        // --- GLOBAL STATE & TIMERS ---
+        window._diagLastUpdate = 0;
+        window._diagEls = null;
+        window.state = window.GameState || {}; // Ensure bridge is early
 
         // ---- Noise ----
         // Random seed hashing
@@ -1182,68 +1208,45 @@
             shelter: { label: 'Sas Habitat', color: 0x99aacc, isModule: true, cost: { Fer: 20, Aluminium: 10 }, footprint: 10 },
             serre: { label: 'Serre', color: 0x88ff88, isModule: true, cost: { Fer: 10, Silicium: 10, Eau: 10 }, footprint: 10, requiredTech: 'greenhouse_auto' },
         };
-
-        // ============================================================
         //  Game State (Bridged to GameState for incremental refactor)
         // ============================================================
         window.state = window.GameState; // Bridge mapping
-
-        // Temporary shim to keep legacy 'state.player' working until fully refactored
-        // We link state.player directly to the local player instance
+        const state = window.state; // Local alias for brevity
+        
+        // Link local player and world state
         window.state.player = window.GameState.players[window.localPlayerId];
         window.state.terra = window.GameState.world;
-        window.state.buildings = []; // Legacy array, will be refactored to GameState.machines
-        window.state.resources = []; // Legacy array, will be refactored to GameState.resources
         
-        // Ensure upgrades are present (multiplayerSystem.js has them)
-        Object.assign(window.state, {
-            player: {
-                o2: 100, hp: 100, energy: 100, inventory: {
-                    // Base metals
-                    Fer: 99999, Aluminium: 99999, Cuivre: 99999, Nickel: 99999, Cobalt: 99999, Titane: 99999, Tungstene: 99999, Platine: 99999, Iridium: 99999,
-                    // Electronics & minerals
-                    Silicium: 99999,
-                    // Crystals
-                    Cristal: 99999, Cristal_Energie: 99999, Cristal_Quantique: 99999, Cristal_Atmo: 99999, Cristal_Bio: 99999,
-                    // Gases & fluids
-                    Gaz: 99999, Gaz_Rares: 99999, Methane: 99999, Hydrogene: 99999, Azote: 99999, Eau: 99999,
-                    // Ice & organics
-                    Glace: 99999, Algue_Alien: 99999, Biomasse: 99999, Biomasse_Primitive: 99999, Plante_Alien: 99999,
-                    // Rare & special
-                    Minerais_Rares: 99999, Artefact: 99999,
-                }, pos: new THREE.Vector3(0, 10, 0),
-                jetpack: { fuel: 100, maxFuel: 100, thrust: 0.16 },
-                jetpackLight: null,
-                inRover: null
-            },
-            upgrades: {
-                jetpack_tank: 0,
-                jetpack_thrust: 0,
-                drill_efficiency: 0,
-                solar_efficiency: 0
-            },
-            terra: { oxygen: 0, temp: -60, pressure: 0, o2Rate: 0, heatRate: 0, pressRate: 0, stage: 0, flora: [] },
-            energy: { production: 0, consumption: 0, stored: 0, maxStorage: 0, ratio: 1.0, status: 'OK' },
-            progression: null, // initialized by ProgressionSystem constructor
-            buildings: [],
-            resources: [],
-            wallColliders: [],
-            floorColliders: [],
-            placing: null,
-            keys: {},
-            mouse: { dx: 0, dy: 0 },
-            yaw: 0,
-            pitch: -0.4,
-            paused: false,
-            started: false,
-            discovered: new Set(),
-            droneSystem: null,
-            scannerActive: false,
-            scienceBonus: 1.0,
-            energySystem: null,
-            progressionSystem: null,
-            planetSystem: null
-        });
+        // Legacy arrays (temporarily separate until refactored)
+        window.state.buildings = []; 
+        window.state.resourceMeshes = new Map(); // Use Map exclusively
+        window.state.wallColliders = [];
+
+        window.state.floorColliders = [];
+        window.state.placing = null;
+        window.state.keys = {};
+        window.state.mouse = { x: 0, y: 0, down: false, dx: 0, dy: 0 };
+        window.state.yaw = Math.PI;
+        window.state.pitch = -0.15;
+        window.state.started = false;
+        
+        // Add energy and other systems not yet part of GameState
+        window.state.energy = { production: 0, consumption: 0, stored: 0, maxStorage: 0, ratio: 1.0, status: 'OK' };
+        window.state.animProps = [];
+        window.state.paused = false;
+        window.state.discovered = new Set();
+        window.state.scannerActive = false;
+        window.state.scienceBonus = 1.0;
+        window.state.energySystem = null;
+        window.state.progressionSystem = null;
+        window.state.droneSystem = null;
+        window.state.planetSystem = null;
+        window.state.upgrades = {
+            jetpack_tank: 0,
+            jetpack_thrust: 0,
+            drill_efficiency: 0,
+            solar_efficiency: 0
+        };
 
         const UPGRADE_DATA = {
             jetpack_tank: {
@@ -1284,13 +1287,16 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
         document.body.prepend(renderer.domElement);
+        window.renderer = renderer; // EXPOSE
 
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0xcad8e0); 
         scene.fog = new THREE.FogExp2(0xd0d8e0, 0.0006); // Neutral fog
+        window.scene = scene; // EXPOSE
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1500);
         camera.rotation.order = 'YXZ';
+        window.camera = camera; // EXPOSE
         state.camera = camera; // expose so RoverSystem can control it
 
         // ─── Lights ─────────────────────────────────────────────────────────
@@ -1321,9 +1327,11 @@
         state.biomeSystem = new BiomeSystem();
         state.progressionSystem = new ProgressionSystem(state);
         state.progressionSystem.init(state);
+        state.networkSystem = new window.NetworkSystem();
 
         // Setup Rovers — Now handled in the module block above via window.state
         state.roverSystem = null;
+        state.botSystem = new BotSystem(scene);
 
 
         // ============================================================
@@ -1435,6 +1443,8 @@
 
         const CHUNK = 64, RES = 48, RD = 3; // Increased resolution for smoother geometry
         const chunks = new Map();
+        state.resourceMeshes = new Map(); // New: Map to track resource meshes by ID
+
 
         // --- Reverted Terrain Material (Original style) ---
         const terrMat = new THREE.MeshStandardMaterial({
@@ -1524,11 +1534,12 @@
                         if (chunkBiome.decorations) allowedDecos = chunkBiome.decorations;
                     }
 
-                    const count = 12 + Math.floor(Math.random() * 10);
-                    for (let i = 0; i < count; i++) {
-                        const type = allowedResources[Math.floor(Math.random() * allowedResources.length)];
-                        spawnResource(type, (cx - 0.5 + Math.random()) * CHUNK, (cz - 0.5 + Math.random()) * CHUNK);
-                    }
+                    // Resources were previously spawned here. Removed for Server Authority.
+                    // const count = 12 + Math.floor(Math.random() * 10);
+                    // for (let i = 0; i < count; i++) {
+                    //     const type = allowedResources[Math.floor(Math.random() * allowedResources.length)];
+                    //     spawnResource(type, (cx - 0.5 + Math.random()) * CHUNK, (cz - 0.5 + Math.random()) * CHUNK);
+                    // }
                     const decoCount = 8 + Math.floor(Math.random() * 15);
                     for (let i = 0; i < decoCount; i++) {
                         const type = allowedDecos[Math.floor(Math.random() * allowedDecos.length)];
@@ -1567,13 +1578,13 @@
             scene.add(m);
         }
 
-        function spawnResource(type, rx, rz) {
+        // Pure visual resource creation (Authoritative Sync)
+        function createResourceMesh(resourceId, type, rx, ry, rz, quantity) {
             try {
                 if (!type) return;
                 const d = RESOURCE_TYPES[type];
                 if (!d) return;
 
-                const ry = getTerrainY(rx, rz);
                 const mat = new THREE.MeshStandardMaterial({
                     color: d.color,
                     emissive: d.emissive || 0x000000,
@@ -1581,26 +1592,40 @@
                 });
                 const geo = new THREE.BoxGeometry(d.size, d.size, d.size);
                 const m = new THREE.Mesh(geo, mat);
-                m.position.set(rx, ry + d.size / 2, rz);
-                m.userData = { type: 'resource', rtype: type };
+                m.position.set(rx, ry, rz); // ry is already offset on server
+                m.userData = { type: 'resource', rtype: type, resourceId: resourceId };
                 m.castShadow = true; m.receiveShadow = true;
                 
-                const resourceId = "res_" + Math.random().toString(36).substr(2, 9);
-                m.userData.resourceId = resourceId;
-                
                 scene.add(m);
-                state.resources.push(m);
-                
-                // ACTION: Register in GameState
-                window.sendAction({
-                    type: 'SPAWN_RESOURCE',
-                    resourceId: resourceId,
-                    resourceType: type,
-                    position: { x: rx, y: ry + d.size / 2, z: rz },
-                    quantity: 1
-                });
-            } catch (e) { }
+                state.resourceMeshes.set(resourceId, m);
+                return m;
+            } catch (e) { console.error("Resource Mesh Fail:", e); }
         }
+
+        // --- NEW: Authoritative Visual Sync ---
+        function syncGameStateVisuals() {
+            if (!state.started) return;
+
+            // 1. Sync Resources
+            const sRes = GameState.resources;
+            
+            // Create missing meshes
+            for (const id in sRes) {
+                if (!state.resourceMeshes.has(id)) {
+                    const r = sRes[id];
+                    createResourceMesh(id, r.type, r.pos.x, r.pos.y, r.pos.z, r.quantity);
+                }
+            }
+            
+            // Remove extra meshes
+            state.resourceMeshes.forEach((mesh, id) => {
+                if (!sRes[id]) {
+                    scene.remove(mesh);
+                    state.resourceMeshes.delete(id);
+                }
+            });
+        }
+
 
         // Barycentric interpolation matching Three.js PlaneGeometry triangles
         function getY(x, z) {
@@ -1699,13 +1724,7 @@
                 playerId: window.localPlayerId
             });
 
-            // Start resources around capsule
-            const types = Object.keys(RESOURCE_TYPES);
-            for (let i = 0; i < 8; i++) {
-                const angle = (i / 8) * Math.PI * 2;
-                const dist = 7 + Math.random() * 5;
-                spawnResource(types[i % types.length], Math.cos(angle) * dist, Math.sin(angle) * dist);
-            }
+            // Start resources around capsule — handled by server now
         }
 
         // ===================        // Helper to add structural ribs to any box
@@ -2889,12 +2908,33 @@
         });
 
         document.getElementById('start-btn').addEventListener('click', () => {
-            document.getElementById('title-screen').style.display = 'none';
-            document.body.requestPointerLock();
-            state.started = true;
-            loop._initDone = false; // Force re-snap
-            updateChunks(state.player.pos.x, state.player.pos.z);
-            showMsg("Bienvenue sur ARES. Appuyez sur E pour ramasser des ressources, B pour construire.");
+            try {
+                document.getElementById('title-screen').style.display = 'none';
+                
+                // Critically important to set standard boolean flags BEFORE high-risk browser APIs
+                state.started = true;
+                loop._initDone = false; // Force camera re-snap
+                
+                // Polyfill pointer lock request (can throw SecurityError on older/sandboxed Safari)
+                const target = document.body;
+                if (target.requestPointerLock) target.requestPointerLock();
+                else if (target.mozRequestPointerLock) target.mozRequestPointerLock();
+                else if (target.webkitRequestPointerLock) target.webkitRequestPointerLock();
+
+                if (state.player && state.player.pos) {
+                    updateChunks(state.player.pos.x, state.player.pos.z);
+                } else {
+                    console.error("[CRITICAL] state.player is undefined during start sequence!");
+                }
+                
+                showMsg("Bienvenue sur ARES. Collectez des cristaux avec E, Construisez avec B.");
+            } catch (err) {
+                console.error("Start Button Initialization Error:", err);
+                const eDiv = document.createElement('div');
+                eDiv.style.cssText = 'position:absolute; top:35%; left:10%; background:red; color:white; padding:15px; border:2px solid yellow; z-index:9999; font-weight:bold; font-size:24px; pointer-events:none;';
+                eDiv.innerText = `[ARES] CRASH AU DÉMARRAGE: ${err.message}`;
+                document.body.appendChild(eDiv);
+            }
         });
 
         document.getElementById('inv-close').addEventListener('click', closeAll);
@@ -2920,7 +2960,7 @@
             const crosshair = document.getElementById('crosshair');
 
             // Check Resources
-            const resHits = raycaster.intersectObjects(state.resources, false);
+            const resHits = raycaster.intersectObjects(Array.from(state.resourceMeshes.values()), false);
             if (resHits.length > 0 && resHits[0].distance < 6) {
                 const type = resHits[0].object.userData.rtype;
                 document.getElementById('interact-action').textContent = `Ramasser ${type}`;
@@ -2998,15 +3038,12 @@
             // When in a rover, the pickup radius is much larger
             const pickupDist = state.player.inRover ? 12 : 6;
 
-            const hits = raycaster.intersectObjects(state.resources, false);
+            const hits = raycaster.intersectObjects(Array.from(state.resourceMeshes.values()), false);
             if (hits.length > 0 && hits[0].distance < pickupDist) {
                 const obj = hits[0].object;
                 const type = obj.userData.rtype;
                 
-                scene.remove(obj);
-                state.resources.splice(state.resources.indexOf(obj), 1);
-                
-                // ACTION: Collect Resource
+                // ACTION: Collect Resource (Server Authority)
                 window.sendAction({
                     type: 'COLLECT_RESOURCE',
                     playerId: window.localPlayerId,
@@ -3014,7 +3051,7 @@
                     amount: 1
                 });
                 
-                updateInvUI();
+                // updateInvUI(); // Will be handled by the next STATE_UPDATE
                 showMsg(`+ 1 ${type}`);
 
                 // Harvesting resources angers the planet
@@ -3418,7 +3455,7 @@
 
             // Draw Resources (Only if scanner is active)
             if (state.scannerActive) {
-                state.resources.forEach(r => {
+                state.resourceMeshes.forEach(r => {
                     const rt = RESOURCE_TYPES[r.userData.rtype];
                     if (!rt) return;
                     ctx.fillStyle = '#' + rt.color.toString(16).padStart(6, '0');
@@ -3522,6 +3559,11 @@
         state.pitch = -0.15;
 
         function updateGame(dt) {
+            // Always re-resolve the player from the live GameState to fix stale references after server INIT
+            if (window.localPlayerId && window.GameState && window.GameState.players[window.localPlayerId]) {
+                state.player = window.GameState.players[window.localPlayerId];
+            }
+            
             // Update camera even if not started to avoid initial black screen
             if (state.player && !state.player.inRover) {
                 camera.rotation.y = state.yaw;
@@ -3530,6 +3572,7 @@
             }
 
             if (!state.started) return;
+
 
                 // --- Update chunks & Discovery ---
                 const now = performance.now();
@@ -3543,6 +3586,7 @@
 
                 // --- Update Sub-systems ---
                 if (state.roverSystem) state.roverSystem.tick(dt, state);
+                if (state.botSystem) state.botSystem.tick(dt, state);
 
                 const ph = state.physics;
 
@@ -3556,6 +3600,14 @@
                     state.player.pos.copy(r.position);
                     if (ph.landingImpact > 0) ph.landingImpact = Math.max(0, ph.landingImpact - dt * 6);
                 } else {
+                    // DEBUG: Physics Heartbeat
+                    if (state.keys['KeyW'] || state.keys['KeyZ'] || state.keys['ArrowUp']) {
+                        if (!window._moveLog) {
+                            console.log("DEBUG_MOVE_ACTIVE", { dt, velX: ph.velX, velZ: ph.velZ, pos: state.player.pos });
+                            window._moveLog = true;
+                        }
+                    } else { window._moveLog = false; }
+                    
                     // --- FPS WALKING PHYSICS ---
 
                     // 1. Compute ground height at feet
@@ -3764,6 +3816,9 @@
                         ph.isGrounded = true;
                     }
                     
+                    // Update local position immediately for smooth feedback
+                    state.player.pos.set(targetPosX, targetPosY, targetPosZ);
+                    
                     // 7.5 Dispatch Action
                     let playerStateString = 'idle';
                     if (!ph.isGrounded) playerStateString = 'jetpack';
@@ -3886,6 +3941,12 @@
                     });
                 }
 
+                // --- Network System ---
+                if (state.networkSystem) state.networkSystem.tick(dt, state);
+
+                // --- NEW: Sync Visuals from authoritative GameState ---
+                if (typeof syncGameStateVisuals === 'function') syncGameStateVisuals();
+
                 // --- HUD & Interaction ---
                 updateInteraction();
                 updateLabProximity();
@@ -3920,6 +3981,9 @@
 
             // 9. Update clouds visual spin
             if (typeof updateClouds === 'function') updateClouds(0.016);
+            
+            // 10. Update Remote Players (Bots) Visuals
+            if (state.botSystem) state.botSystem.renderVisuals(state);
 
             renderer.render(scene, camera);
             if (!window._initLog) { console.log("✅ ARES LOOP ACTIVE - Rendering Scene"); window._initLog = true; }
@@ -3928,11 +3992,56 @@
         function loop() {
             try {
                 requestAnimationFrame(loop);
-                const dt = Math.min(clock.getDelta(), 0.05);
+                var now = performance.now();
+                // Ensure dt is at least 0.016 to avoid 0-delta stalls on first frame
+                var rawDelta = clock.getDelta();
+                var dt = Math.min(rawDelta > 0 ? rawDelta : 0.016, 0.05);
+                
                 updateGame(dt);
                 renderGame();
+
+                // Inline diagnostics (throttled to ~2fps)
+                if (state.started && (now - (window._diagLastUpdate || 0) > 500)) {
+                    window._diagLastUpdate = now;
+
+                    if (!window._diagEls) {
+                        window._diagEls = {
+                            players: document.getElementById('diag-players'),
+                            machines: document.getElementById('diag-machines'),
+                            resources: document.getElementById('diag-resources'),
+                            status: document.getElementById('diag-status')
+                        };
+                    }
+                    var de = window._diagEls;
+                    var diagStatus = 'OK';
+                    
+                    // Heartbeat indicator to prove loop is alive
+                    var heartbeat = (Math.floor(now / 500) % 2 === 0) ? '●' : '○';
+                    
+                    if (de.players) de.players.innerText = 'Players: ' + Object.keys(state.players).length;
+                    if (de.machines) de.machines.innerText = 'Machines: ' + Object.keys(state.machines).length;
+                    if (de.resources) de.resources.innerText = 'Resources: ' + (state.resourceMeshes ? state.resourceMeshes.size : 0);
+                    
+                    var diagColor = 'lime';
+                    for (var pid in state.players) {
+                        var pp = state.players[pid];
+                        if (!pp || !pp.pos || isNaN(pp.pos.x)) { diagStatus = 'ERROR: Invalid Player'; diagColor = 'red'; }
+                    }
+                    if (de.status) { 
+                        de.status.innerText = 'Status: ' + diagStatus + ' ' + heartbeat; 
+                        de.status.style.color = diagColor; 
+                    }
+                }
             } catch (err) {
-                console.error("🚀 ARES PROTOCOL Loop Crash Prevented:", err);
+                console.error('[ARES] Loop crash:', err.message, err.stack);
+                var eDiv = document.getElementById('ares-crash-box');
+                if (!eDiv) {
+                    eDiv = document.createElement('div');
+                    eDiv.id = 'ares-crash-box';
+                    eDiv.style.cssText = 'position:fixed;top:10%;left:5%;right:5%;background:#cc0000;color:#fff;padding:20px;border:3px solid #ff0;z-index:99999;font-family:monospace;font-size:14px;white-space:pre-wrap;border-radius:8px;';
+                    document.body.appendChild(eDiv);
+                }
+                eDiv.innerText = 'CRASH: ' + err.message + '\n' + err.stack;
             }
         }
 
@@ -3940,6 +4049,12 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        document.getElementById('btn-spawn-bots').addEventListener('click', () => {
+            if (state.botSystem) {
+                for (let i = 0; i < 5; i++) state.botSystem.spawnBot();
+            }
         });
 
         loop();

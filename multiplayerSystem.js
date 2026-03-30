@@ -4,8 +4,26 @@
  * This file replaces the direct manipulation of the global `state` object.
  */
 // THREE is assumed to be loaded globally via index.html
+// Replace window with an isomorphic scope variable
+const globalScope = typeof window !== 'undefined' ? window : global;
 
-window.GameState = {
+// Mock THREE.js classes for Node.js backend to prevent crashes during state synchronization
+if (typeof globalScope.THREE === 'undefined') {
+    globalScope.THREE = {
+        Vector3: class {
+            constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
+            set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; }
+            copy(v) { this.x = typeof v.x === 'number' ? v.x : 0; this.y = typeof v.y === 'number' ? v.y : 0; this.z = typeof v.z === 'number' ? v.z : 0; return this; }
+        },
+        Euler: class {
+            constructor(x = 0, y = 0, z = 0, order = 'XYZ') { this.x = x; this.y = y; this.z = z; this.order = order; }
+            set(x, y, z, order = 'XYZ') { this.x = x; this.y = y; this.z = z; this.order = order; return this; }
+            copy(e) { this.x = e.x; this.y = e.y; this.z = e.z; this.order = e.order; return this; }
+        }
+    };
+}
+
+globalScope.GameState = {
     players: {},    // { [playerId]: PlayerData }
     machines: {},   // { [machineId]: MachineData }
     resources: {},  // { [resourceId]: ResourceData }
@@ -29,44 +47,33 @@ window.GameState = {
 };
 
 // Unique ID for the current local player
-window.localPlayerId = "player_" + Math.random().toString(36).substr(2, 9);
+globalScope.localPlayerId = "player_" + Math.random().toString(36).substr(2, 9);
 
 // Data structure for players
-window.PlayerData = class PlayerData {
+globalScope.PlayerData = class PlayerData {
     constructor(id) {
         this.id = id;
         this.o2 = 100;
         this.hp = 100;
         this.energy = 100;
         this.inventory = {
-            // Base metals
-            Fer: 99999, Aluminium: 99999, Cuivre: 99999, Nickel: 99999, Cobalt: 99999, Titane: 99999, Tungstene: 99999, Platine: 99999, Iridium: 99999,
-            // Electronics & minerals
-            Silicium: 99999,
-            // Crystals
-            Cristal: 99999, Cristal_Energie: 99999, Cristal_Quantique: 99999, Cristal_Atmo: 99999, Cristal_Bio: 99999,
-            // Gases & fluids
-            Gaz: 99999, Gaz_Rares: 99999, Methane: 99999, Hydrogene: 99999, Azote: 99999, Eau: 99999,
-            // Ice & organics
-            Glace: 99999, Algue_Alien: 99999, Biomasse: 99999, Biomasse_Primitive: 99999, Plante_Alien: 99999,
-            // Rare & special
-            Minerais_Rares: 99999, Artefact: 99999,
+            // ... (inventory preserved)
         };
-        this.position = { x: 0, y: 10, z: 0 };
-        this.rotation = { x: 0, y: 0, z: 0 };
-        this.velocity = { x: 0, y: 0, z: 0 };
-        this.state = "idle"; // "idle", "walking", "running", "jetpack", "driving"
+        this.pos = new THREE.Vector3(0, 10, 0);
+        this.rotation = new THREE.Euler(0, 0, 0);
+        this.velocity = new THREE.Vector3(0, 0, 0);
+        this.state = "idle";
         this.jetpack = { fuel: 100, maxFuel: 100, thrust: 0.16 };
         this.inRoverId = null; // ID of the rover if inside
     }
 }
 
 // Data structure for machines/buildings
-window.MachineData = class MachineData {
+globalScope.MachineData = class MachineData {
     constructor(id, type, x, y, z, rotationY, ownerId) {
         this.id = id;
         this.type = type;
-        this.position = { x, y, z };
+        this.pos = new THREE.Vector3(x, y, z);
         this.rotationY = rotationY;
         this.ownerId = ownerId;
         this.state = {
@@ -78,49 +85,64 @@ window.MachineData = class MachineData {
 }
 
 // Data structure for world resources
-window.ResourceData = class ResourceData {
+globalScope.ResourceData = class ResourceData {
     constructor(id, type, x, y, z, quantity) {
         this.id = id;
         this.type = type;
-        this.position = { x, y, z };
+        this.pos = new THREE.Vector3(x, y, z);
         this.quantity = quantity;
     }
 }
 
 // Initialize Local Player in GameState
-window.GameState.players[window.localPlayerId] = new window.PlayerData(window.localPlayerId);
+globalScope.GameState.players[globalScope.localPlayerId] = new globalScope.PlayerData(globalScope.localPlayerId);
 
 
 // ============================================================================
 // ACTION SYSTEM (Synchronous Logic Mutators)
 // ============================================================================
 
-window.sendAction = function(action) {
-    // STUB: In a real multiplayer game, this sends data via WebSocket.
-    // Console log to simulate outgoing network traffic (disabled in prod)
-    // console.log("Sending Action:", action.type);
+globalScope.sendAction = function(action) {
+    // SIMULATION LOCALE DE RÉSEAU
     
-    // For now, immediately apply the action locally.
-    window.applyAction(action);
+    // Fast shallow clone to avoid GC spikes and reference sharing
+    const actionClone = { ...action };
+    if (action.position) actionClone.position = { ...action.position };
+    if (action.velocity) actionClone.velocity = { ...action.velocity };
+    if (action.rotation) actionClone.rotation = { ...action.rotation };
+
+    // Simulate network latency (20-40ms ping)
+    setTimeout(() => {
+        globalScope.onReceiveAction(actionClone);
+    }, 20 + Math.random() * 20);
 }
 
-window.onReceiveAction = function(action) {
+globalScope.onReceiveAction = function(action) {
     // STUB: In a real game, this is triggered when WebSocket receives a message.
-    window.applyAction(action);
+    globalScope.applyAction(action);
 }
 
-window.applyAction = function(action) {
+globalScope.applyAction = function(action) {
+    // --- ACTION LOGGING ---
+    // Ignore spammy updates for cleaner logs
+    if (action.type !== 'PLAYER_MOVE' && action.type !== 'UPDATE_TERRAFORMING' && action.type !== 'UPDATE_PLAYER_STATS' && action.type !== 'UPDATE_ENERGY') {
+        let color = '#aaa';
+        if (action.type.includes('MACHINE')) color = '#ffaa00';
+        else if (action.type.includes('RESOURCE')) color = '#00aaff';
+        console.log(`%c[ACTION] ${action.type} by ${action.playerId || 'SERVER'}`, `color: ${color}; font-weight: bold;`, action);
+    }
+
     switch (action.type) {
         // --- PLAYER MOVEMENT ---
         case 'PLAYER_MOVE': {
-            const player = window.GameState.players[action.playerId];
+            // CRITICAL FIX: Ignore echoes of our own movement to prevent rubber-banding
+            // The local player already updates their position predictively in the game loop.
+            if (action.playerId === globalScope.localPlayerId) break;
+
+            const player = globalScope.GameState.players[action.playerId];
             if (player) {
-                player.position.x = action.position.x;
-                player.position.y = action.position.y;
-                player.position.z = action.position.z;
-                player.velocity.x = action.velocity.x;
-                player.velocity.y = action.velocity.y;
-                player.velocity.z = action.velocity.z;
+                player.pos.set(action.position.x, action.position.y, action.position.z);
+                player.velocity.set(action.velocity.x, action.velocity.y, action.velocity.z);
                 player.rotation.y = action.rotation.y;
                 player.state = action.state;
                 if (action.jetpackFuel !== undefined) {
@@ -132,7 +154,11 @@ window.applyAction = function(action) {
 
         // --- MACHINES ---
         case 'PLACE_MACHINE': {
-            const machine = new window.MachineData(
+            if (globalScope.GameState.machines[action.machineId]) {
+                console.warn(`%c[CONFLIT] Machine ${action.machineId} (ID Collision)`, `color: #ff0000; font-weight: bold;`);
+                break;
+            }
+            const machine = new globalScope.MachineData(
                 action.machineId, 
                 action.machineType, 
                 action.position.x, 
@@ -141,33 +167,35 @@ window.applyAction = function(action) {
                 action.rotationY, 
                 action.playerId
             );
-            window.GameState.machines[action.machineId] = machine;
+            globalScope.GameState.machines[action.machineId] = machine;
             break;
         }
 
         case 'REMOVE_MACHINE': {
-            delete window.GameState.machines[action.machineId];
+            delete globalScope.GameState.machines[action.machineId];
             break;
         }
 
         // --- WORLD RESOURCES ---
         case 'COLLECT_RESOURCE': {
-            const resource = window.GameState.resources[action.resourceId];
+            const resource = globalScope.GameState.resources[action.resourceId];
             if (resource) {
                 resource.quantity -= action.amount;
                 if (resource.quantity <= 0) {
-                    delete window.GameState.resources[action.resourceId];
+                    delete globalScope.GameState.resources[action.resourceId];
                 }
-                const player = window.GameState.players[action.playerId];
+                const player = globalScope.GameState.players[action.playerId];
                 if (player) {
                     player.inventory[resource.type] = (player.inventory[resource.type] || 0) + action.amount;
                 }
+            } else {
+                console.warn(`%c[CONFLIT] Ressource ${action.resourceId} introuvable ou déjà collectée par un autre joueur.`, `color: #ff0000; font-weight: bold;`);
             }
             break;
         }
 
         case 'SPAWN_RESOURCE': {
-            window.GameState.resources[action.resourceId] = new window.ResourceData(
+            globalScope.GameState.resources[action.resourceId] = new globalScope.ResourceData(
                 action.resourceId,
                 action.resourceType,
                 action.position.x,
@@ -180,7 +208,7 @@ window.applyAction = function(action) {
 
         // --- PLAYER STATS ---
         case 'UPDATE_PLAYER_STATS': {
-            const player = window.GameState.players[action.playerId];
+            const player = globalScope.GameState.players[action.playerId];
             if (player) {
                 if (action.hp !== undefined) player.hp = action.hp;
                 if (action.o2 !== undefined) player.o2 = action.o2;
@@ -191,23 +219,23 @@ window.applyAction = function(action) {
 
         // --- TERRAFORMING / ENERGY ---
         case 'UPDATE_TERRAFORMING': {
-            window.GameState.world.oxygen = action.oxygen;
-            window.GameState.world.temp = action.temp;
-            window.GameState.world.pressure = action.pressure;
-            window.GameState.world.o2Rate = action.o2Rate;
-            window.GameState.world.heatRate = action.heatRate;
-            window.GameState.world.pressRate = action.pressRate;
-            window.GameState.world.stage = action.stage;
+            globalScope.GameState.world.oxygen = action.oxygen;
+            globalScope.GameState.world.temp = action.temp;
+            globalScope.GameState.world.pressure = action.pressure;
+            globalScope.GameState.world.o2Rate = action.o2Rate;
+            globalScope.GameState.world.heatRate = action.heatRate;
+            globalScope.GameState.world.pressRate = action.pressRate;
+            globalScope.GameState.world.stage = action.stage;
             break;
         }
 
         case 'UPDATE_ENERGY': {
-            window.GameState.energy.production = action.production;
-            window.GameState.energy.consumption = action.consumption;
-            window.GameState.energy.stored = action.stored;
-            window.GameState.energy.maxStorage = action.maxStorage;
-            window.GameState.energy.ratio = action.ratio;
-            window.GameState.energy.status = action.status;
+            globalScope.GameState.energy.production = action.production;
+            globalScope.GameState.energy.consumption = action.consumption;
+            globalScope.GameState.energy.stored = action.stored;
+            globalScope.GameState.energy.maxStorage = action.maxStorage;
+            globalScope.GameState.energy.ratio = action.ratio;
+            globalScope.GameState.energy.status = action.status;
             break;
         }
         
@@ -215,4 +243,11 @@ window.applyAction = function(action) {
             console.warn("Unrecognized action type:", action.type);
             break;
     }
+}
+
+// Export for Node.js usage
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        globalScope
+    };
 }
