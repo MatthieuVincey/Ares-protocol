@@ -3643,6 +3643,10 @@
                     const isJetpackActive = state.keys['Space'] && !ph.isGrounded && state.player.jetpack.fuel > 0 && state.progression && state.progression.level >= 1;
 
                     if (ph.isGrounded) {
+                        if (state.player.jetpackVisual) {
+                            scene.remove(state.player.jetpackVisual);
+                            state.player.jetpackVisual = null;
+                        }
                         if (state.player.jetpackLight) {
                             scene.remove(state.player.jetpackLight);
                             state.player.jetpackLight = null;
