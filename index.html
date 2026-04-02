@@ -2634,9 +2634,11 @@
             if (!el) return;
             const isOpen = el.style.display !== 'none';
             document.querySelectorAll('.menu-panel').forEach(m => m.style.display = 'none');
+            
             if (isOpen) {
                 el.style.display = 'none';
-                document.exitPointerLock && document.exitPointerLock();
+                state.paused = false;
+                document.body.requestPointerLock();
             } else {
                 renderTechPanel();
                 el.style.display = 'block';
@@ -2779,6 +2781,7 @@
             document.querySelectorAll('.menu-panel').forEach(m => m.style.display = 'none');
             document.getElementById('upgrade-panel').style.display = 'none';
             document.getElementById('lab-panel').style.display = 'none';
+            document.getElementById('tech-panel').style.display = 'none';
             state.paused = false;
             document.body.requestPointerLock();
         }
@@ -2885,10 +2888,17 @@
                 const bmenu = document.getElementById('build-panel');
                 const imenu = document.getElementById('inv-panel');
                 const mmenu = document.getElementById('map-panel');
+                const tmenu = document.getElementById('tech-panel');
+                const upmenu = document.getElementById('upgrade-panel');
+                const lmenu = document.getElementById('lab-panel');
+
                 // Don't lock if clicking inside a menu
                 if (bmenu.style.display === 'block' && bmenu.contains(e.target)) return;
                 if (imenu.style.display === 'block' && imenu.contains(e.target)) return;
                 if (mmenu.style.display === 'block' && mmenu.contains(e.target)) return;
+                if (tmenu.style.display === 'block' && tmenu.contains(e.target)) return;
+                if (upmenu.style.display === 'block' && upmenu.contains(e.target)) return;
+                if (lmenu.style.display === 'block' && lmenu.contains(e.target)) return;
 
                 document.body.requestPointerLock();
             }
