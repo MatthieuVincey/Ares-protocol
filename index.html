@@ -881,7 +881,6 @@
             <div id="diag-machines">Machines: 0</div>
             <div id="diag-resources">Resources: 0</div>
             <div id="diag-status" style="color:lime; margin-top:3px;">Status: WAITING</div>
-            <button id="btn-spawn-bots" style="margin-top:8px; width:100%; border-radius:2px; background:#005500; color:white; border:1px solid #00ff00; cursor:pointer;">Spawn 5 Bots</button>
         </div>
 
         <!-- Biome Info -->
@@ -1041,13 +1040,13 @@
     <script src="biomeSystem.js?v=v7_neutral_grey"></script>
     <script src="multiplayerSystem.js"></script>
     <script src="networkSystem.js"></script>
+    <script src="remotePlayerRenderer.js"></script>
 
     <script src="livingPlanetSystem.js?v=v7_neutral_grey"></script>
     <script src="energySystem.js?v=2"></script>
     <script src="progressionSystem.js?v=2"></script>
     <script src="droneSystem.js"></script>
     <script src="roverSystem.js"></script>
-    <script src="botSystem.js"></script>
     <script>
         // Standard initialization that works with file:// protocol
         (function initRoverSystem() {
@@ -1239,7 +1238,6 @@
         window.state.scienceBonus = 1.0;
         window.state.energySystem = null;
         window.state.progressionSystem = null;
-        window.state.droneSystem = null;
         window.state.planetSystem = null;
         window.state.upgrades = {
             jetpack_tank: 0,
@@ -1328,6 +1326,7 @@
         state.progressionSystem = new ProgressionSystem(state);
         state.progressionSystem.init(state);
         state.networkSystem = new window.NetworkSystem();
+        state.remotePlayerRenderer = new RemotePlayerRenderer(scene);
 
         // Setup Rovers — Now handled in the module block above via window.state
         state.roverSystem = null;
@@ -3590,7 +3589,6 @@
 
                 // --- Update Sub-systems ---
                 if (state.roverSystem) state.roverSystem.tick(dt, state);
-                if (state.botSystem) state.botSystem.tick(dt, state);
 
                 const ph = state.physics;
 
@@ -3986,8 +3984,8 @@
             // 9. Update clouds visual spin
             if (typeof updateClouds === 'function') updateClouds(0.016);
             
-            // 10. Update Remote Players (Bots) Visuals
-            if (state.botSystem) state.botSystem.renderVisuals(state);
+            // 10. Update Remote Players Visuals
+            if (state.remotePlayerRenderer) state.remotePlayerRenderer.renderVisuals(state);
 
             renderer.render(scene, camera);
             if (!window._initLog) { console.log("✅ ARES LOOP ACTIVE - Rendering Scene"); window._initLog = true; }
@@ -4053,12 +4051,6 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        document.getElementById('btn-spawn-bots').addEventListener('click', () => {
-            if (state.botSystem) {
-                for (let i = 0; i < 5; i++) state.botSystem.spawnBot();
-            }
         });
 
         loop();
