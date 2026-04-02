@@ -218,6 +218,15 @@ globalScope.applyAction = function(action) {
             break;
         }
 
+        // --- CUSTOMIZATION ---
+        case 'UPDATE_PSEUDO': {
+            const player = globalScope.GameState.players[action.playerId];
+            if (player && action.pseudo) {
+                player.pseudo = action.pseudo;
+            }
+            break;
+        }
+
         // --- TERRAFORMING / ENERGY ---
         case 'UPDATE_TERRAFORMING': {
             globalScope.GameState.world.oxygen = action.oxygen;
