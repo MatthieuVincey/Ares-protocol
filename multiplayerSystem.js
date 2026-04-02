@@ -62,6 +62,7 @@ globalScope.PlayerData = class PlayerData {
         this.pos = new THREE.Vector3(0, 10, 0);
         this.rotation = new THREE.Euler(0, 0, 0);
         this.velocity = new THREE.Vector3(0, 0, 0);
+        this.pseudo = "Astronaute";
         this.state = "idle";
         this.jetpack = { fuel: 100, maxFuel: 100, thrust: 0.16 };
         this.inRoverId = null; // ID of the rover if inside

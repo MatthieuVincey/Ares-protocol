@@ -4,13 +4,12 @@
  */
 
 // ==========================================
-// 🌐 CONFIGURATION RÉSEAU (NGROK / LOCAL)
+// 🌐 CONFIGURATION RÉSEAU (CLOUD / LOCAL)
 // ==========================================
-// Pour jouer avec un ami :
-// 1. Lancez ngrok : ngrok http 3000
-// 2. Remplacez l'URL ci-dessous par celle fournie par ngrok (ex: "wss://1234abcd.ngrok-free.app")
-// 3. Laissez vide ("") pour jouer seul en local (localhost)
-const SERVER_URL = ""; 
+// Calcul automatique de l'URL du serveur pour qu'il fonctionne :
+// 1. En local (http://localhost:3000 -> ws://localhost:3000)
+// 2. En ligne (https://votre-jeu.onrender.com -> wss://votre-jeu.onrender.com)
+const SERVER_URL = window.location.origin.replace("http", "ws");
 // ==========================================
 
 class NetworkSystem {
@@ -21,14 +20,7 @@ class NetworkSystem {
     }
 
     connect() {
-        let wsUrl;
-        if (SERVER_URL && SERVER_URL !== "") {
-            wsUrl = SERVER_URL;
-        } else {
-            // Auto-detect localhost if no custom URL provided
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            wsUrl = `${protocol}//${window.location.host}`;
-        }
+        const wsUrl = SERVER_URL;
         
         console.log(`[NETWORK] Connecting to ${wsUrl}...`);
         this.socket = new WebSocket(wsUrl);
@@ -84,6 +76,15 @@ class NetworkSystem {
             
             // Assign true server ID first
             window.localPlayerId = message.playerId;
+
+            // Immediately send the requested pseudonym to the server if one was provided in the UI
+            if (window.localPlayerPseudo) {
+                window.sendAction({
+                    type: 'UPDATE_PSEUDO',
+                    playerId: window.localPlayerId,
+                    pseudo: window.localPlayerPseudo
+                });
+            }
             
             // Perform a full hard sync of the initial state (now includes the new playerId)
             this.hardSyncState(message.state);

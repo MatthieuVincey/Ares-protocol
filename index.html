@@ -732,10 +732,31 @@
         }
 
         #title-screen p {
+            color: #88ccff;
+            font-size: 20px;
             letter-spacing: 3px;
-            opacity: 0.5;
-            font-size: 13px;
-            margin-bottom: 50px;
+            margin-bottom: 30px;
+        }
+
+        #player-pseudo {
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #00aaff;
+            color: #ffffff;
+            font-family: inherit;
+            font-size: 18px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            text-align: center;
+            width: 80%;
+            max-width: 300px;
+            margin-bottom: 30px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #player-pseudo:focus {
+            border-color: #00ffaa;
+            box-shadow: 0 0 15px rgba(0, 255, 170, 0.4);
         }
 
         #title-screen .start-btn {
@@ -841,7 +862,8 @@
     <!-- Title Screen -->
     <div id="title-screen">
         <h1>ARES PROTOCOL</h1>
-        <p>TERRAFORMATION - PROTOCOLE SOLO</p>
+        <p>MISSION MULTIJOUEUR</p>
+        <input type="text" id="player-pseudo" placeholder="Entrez votre pseudonyme..." maxlength="16" autocomplete="off" />
         <button class="start-btn" id="start-btn">▶ COMMENCER</button>
     </div>
 
@@ -2912,11 +2934,24 @@
 
         document.getElementById('start-btn').addEventListener('click', () => {
             try {
+                // Capture the pseudo
+                const pseudoInput = document.getElementById('player-pseudo').value.trim();
+                window.localPlayerPseudo = pseudoInput.length > 0 ? pseudoInput : "Astronaute";
+
                 document.getElementById('title-screen').style.display = 'none';
                 
                 // Critically important to set standard boolean flags BEFORE high-risk browser APIs
                 state.started = true;
                 loop._initDone = false; // Force camera re-snap
+                
+                // If the network system is already connected, send the pseudo update immediately
+                if (window.networkSystem && window.networkSystem.connected && window.localPlayerId) {
+                    window.sendAction({
+                        type: 'UPDATE_PSEUDO',
+                        playerId: window.localPlayerId,
+                        pseudo: window.localPlayerPseudo
+                    });
+                }
                 
                 // Polyfill pointer lock request (can throw SecurityError on older/sandboxed Safari)
                 const target = document.body;

@@ -70,10 +70,16 @@ class RemotePlayerRenderer {
                 document.body.appendChild(labelDiv);
                 
                 v.userData.label = labelDiv;
-                
-                // Format the ID for display
-                const shortId = playerId.replace('player_', 'ARES-');
-                labelDiv.innerText = shortId;
+            }
+
+            // Update Format the ID for display
+            if (v.userData.label) {
+                if (pData.pseudo && pData.pseudo !== "Astronaute") {
+                    v.userData.label.innerText = pData.pseudo;
+                } else {
+                    const shortId = playerId.replace('player_', 'ARES-');
+                    v.userData.label.innerText = shortId;
+                }
             }
 
             // Smooth Interpolation could go here, for now we snap
