@@ -874,14 +874,7 @@
         <button class="close-btn" id="tech-close" style="margin-top:16px">FERMER [T]</button>
     </div>
     <div id="hud">
-        <!-- Server Diagnostics -->
-        <div id="server-diag" style="position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.8); color:#00ff00; padding:10px; font-family:monospace; border:1px solid #00ff00; z-index:100; font-size:12px; pointer-events:auto; text-shadow:none;">
-            <h3 style="margin:0 0 5px 0; border-bottom:1px solid #00ff00; padding-bottom:3px;">Diagnostics Serveur</h3>
-            <div id="diag-players">Players: 0</div>
-            <div id="diag-machines">Machines: 0</div>
-            <div id="diag-resources">Resources: 0</div>
-            <div id="diag-status" style="color:lime; margin-top:3px;">Status: WAITING</div>
-        </div>
+
 
         <!-- Biome Info -->
         <div id="biome-info">
@@ -4012,39 +4005,6 @@
                 
                 updateGame(dt);
                 renderGame();
-
-                // Inline diagnostics (throttled to ~2fps)
-                if (state.started && (now - (window._diagLastUpdate || 0) > 500)) {
-                    window._diagLastUpdate = now;
-
-                    if (!window._diagEls) {
-                        window._diagEls = {
-                            players: document.getElementById('diag-players'),
-                            machines: document.getElementById('diag-machines'),
-                            resources: document.getElementById('diag-resources'),
-                            status: document.getElementById('diag-status')
-                        };
-                    }
-                    var de = window._diagEls;
-                    var diagStatus = 'OK';
-                    
-                    // Heartbeat indicator to prove loop is alive
-                    var heartbeat = (Math.floor(now / 500) % 2 === 0) ? '●' : '○';
-                    
-                    if (de.players) de.players.innerText = 'Players: ' + Object.keys(state.players).length;
-                    if (de.machines) de.machines.innerText = 'Machines: ' + Object.keys(state.machines).length;
-                    if (de.resources) de.resources.innerText = 'Resources: ' + (state.resourceMeshes ? state.resourceMeshes.size : 0);
-                    
-                    var diagColor = 'lime';
-                    for (var pid in state.players) {
-                        var pp = state.players[pid];
-                        if (!pp || !pp.pos || isNaN(pp.pos.x)) { diagStatus = 'ERROR: Invalid Player'; diagColor = 'red'; }
-                    }
-                    if (de.status) { 
-                        de.status.innerText = 'Status: ' + diagStatus + ' ' + heartbeat; 
-                        de.status.style.color = diagColor; 
-                    }
-                }
             } catch (err) {
                 console.error('[ARES] Loop crash:', err.message, err.stack);
                 var eDiv = document.getElementById('ares-crash-box');
