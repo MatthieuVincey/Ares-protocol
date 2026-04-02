@@ -2886,7 +2886,7 @@
         // Re-lock pointer on click if game started and not paused by menu
         document.addEventListener('mousedown', (e) => {
             if (state.started && document.pointerLockElement !== document.body) {
-                const bmenu = document.getElementById('build-menu');
+                const bmenu = document.getElementById('build-panel');
                 const imenu = document.getElementById('inv-panel');
                 const mmenu = document.getElementById('map-panel');
                 // Don't lock if clicking inside a menu
