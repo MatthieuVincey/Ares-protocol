@@ -15,20 +15,24 @@ const biomeSystem = new BiomeSystem(42); // Fixed seed for multiplayer
 function seedWorld() {
     console.log("[WORLD] Seeding authoritative resources...");
     
-    // Spawn 20 resources right near the start (0,0)
-    for (let i = 0; i < 20; i++) {
+    // Spawn 60 resources right near the start (0,0)
+    for (let i = 0; i < 60; i++) {
         const angle = Math.random() * Math.PI * 2;
-        const dist = 5 + Math.random() * 25;
+        const dist = 5 + Math.random() * 45;
         const rx = Math.cos(angle) * dist;
         const rz = Math.sin(angle) * dist;
         spawnSingleResource(rx, rz);
     }
 
-    // Spawn 500 resources globally
-    const clusterCount = 500;
+    // Spawn 4000 resources globally, biased closer to the center
+    const clusterCount = 4000;
     for (let i = 0; i < clusterCount; i++) {
-        const rx = (Math.random() - 0.5) * 1600;
-        const rz = (Math.random() - 0.5) * 1600;
+        // Bias logic: square the random value so more resources clump closer to 0,0
+        const bias = Math.pow(Math.random(), 1.5); 
+        const dist = bias * 1000; // max distance 1000m
+        const angle = Math.random() * Math.PI * 2;
+        const rx = Math.cos(angle) * dist;
+        const rz = Math.sin(angle) * dist;
         spawnSingleResource(rx, rz);
     }
     

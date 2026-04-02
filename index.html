@@ -1564,8 +1564,7 @@
                 geo = new THREE.BoxGeometry(0.8, 0.8, 1.2);
                 mat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.8, roughness: 0.4 });
             } else {
-                geo = new THREE.IcosahedronGeometry(0.5, 1);
-                mat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+                return; // Do not spawn generic placeholder visible as white balls
             }
 
             const m = new THREE.Mesh(geo, mat);
