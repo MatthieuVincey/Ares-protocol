@@ -27,9 +27,9 @@ function seedWorld() {
     // Spawn 4000 resources globally, biased closer to the center
     const clusterCount = 4000;
     for (let i = 0; i < clusterCount; i++) {
-        // Bias logic: square the random value so more resources clump closer to 0,0
-        const bias = Math.pow(Math.random(), 1.5); 
-        const dist = bias * 1000; // max distance 1000m
+        // Linear random distribution (smoother) instead of heavy exponent bias
+        const bias = Math.pow(Math.random(), 0.85); 
+        const dist = bias * 1400; // max distance 1400m
         const angle = Math.random() * Math.PI * 2;
         const rx = Math.cos(angle) * dist;
         const rz = Math.sin(angle) * dist;
@@ -68,9 +68,9 @@ setInterval(() => {
     // Spawn 100 new resources to replace gathered ones
     const newCount = 100;
     for (let i = 0; i < newCount; i++) {
-        // Bias logic: square the random value so more resources clump closer to 0,0
-        const bias = Math.pow(Math.random(), 1.5); 
-        const dist = bias * 1000; // max distance 1000m
+        // Spreading resource regeneration uniformly over a 1400m radius
+        const bias = Math.pow(Math.random(), 0.85); 
+        const dist = bias * 1400; // max distance 1400m
         const angle = Math.random() * Math.PI * 2;
         const rx = Math.cos(angle) * dist;
         const rz = Math.sin(angle) * dist;

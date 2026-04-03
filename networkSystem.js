@@ -222,6 +222,10 @@ class NetworkSystem {
         for (const id in localState.resources) {
             if (!serverState.resources[id]) delete localState.resources[id];
         }
+
+        for (const id in localState.resources) {
+            if (!serverState.resources[id]) delete localState.resources[id];
+        }
     }
 
     tick(dt, state) {
