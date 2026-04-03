@@ -29,6 +29,17 @@ class NetworkSystem {
             console.log("[NETWORK] Connected to server successfully.");
             this.connected = true;
             this.overrideActionSystem();
+
+            // After connecting, check if we have a stored session to reclaim
+            const storedId = localStorage.getItem('ares_player_id');
+            if (storedId) {
+                console.log(`[NETWORK] Attempting to reclaim session: ${storedId}`);
+                this.socket.send(JSON.stringify({ 
+                    type: 'SESSION_RECLAIM', 
+                    playerId: storedId,
+                    pseudo: window.localPlayerPseudo 
+                }));
+            }
         };
 
         this.socket.onmessage = (event) => {
@@ -76,6 +87,7 @@ class NetworkSystem {
             
             // Assign true server ID first
             window.localPlayerId = message.playerId;
+            localStorage.setItem('ares_player_id', message.playerId);
 
             // Immediately send the requested pseudonym to the server if one was provided in the UI
             if (window.localPlayerPseudo) {

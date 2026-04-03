@@ -854,6 +854,37 @@
             border-color: #666;
             color: #666;
         }
+
+        #death-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(255, 0, 0, 0.4);
+            display: none;
+            z-index: 10000;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            text-shadow: 0 0 20px #ff0000;
+            backdrop-filter: blur(5px);
+        }
+
+        #death-screen h2 {
+            font-size: 48px;
+            margin: 0;
+            letter-spacing: 10px;
+        }
+
+        #death-screen p {
+            font-size: 18px;
+            margin-top: 20px;
+            opacity: 0.8;
+            letter-spacing: 2px;
+        }
     </style>
 </head>
 
@@ -865,6 +896,12 @@
         <p>MISSION MULTIJOUEUR</p>
         <input type="text" id="player-pseudo" placeholder="Entrez votre pseudonyme..." maxlength="16" autocomplete="off" />
         <button class="start-btn" id="start-btn">▶ COMMENCER</button>
+    </div>
+
+    <!-- Death Screen -->
+    <div id="death-screen">
+        <h2>URGENCE VITALE</h2>
+        <p>ÉCHEC DES SYSTÈMES DE SURVIE - RÉINITIALISATION EN COURS...</p>
     </div>
 
     <!-- HUD -->
@@ -3908,6 +3945,31 @@
                         o2: targetO2,
                         hp: targetHp
                     });
+                }
+
+                // --- Death Handling ---
+                if (targetHp <= 0 && !state._isDead) {
+                    state._isDead = true;
+                    // Show death overlay
+                    const ds = document.getElementById('death-screen');
+                    if (ds) ds.style.display = 'flex';
+                    
+                    // Delay respawn
+                    setTimeout(() => {
+                        state.player.pos.set(0, getTerrainY(0, 0) + 50, 0);
+                        state.physics.velY = 0;
+                        state._isDead = false;
+                        if (ds) ds.style.display = 'none';
+                        
+                        // Reset stats on server
+                        window.sendAction({
+                            type: 'UPDATE_PLAYER_STATS',
+                            playerId: window.localPlayerId,
+                            o2: 100,
+                            hp: 100
+                        });
+                        showMsg("Séquence de survie réinitialisée");
+                    }, 3000);
                 }
 
                 // --- Automated Extraction & Drones ---

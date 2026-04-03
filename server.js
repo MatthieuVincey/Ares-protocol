@@ -92,8 +92,8 @@ const wss = new WebSocket.Server({ server });
 const clients = new Map(); // Map socket to playerId
 
 wss.on('connection', (ws) => {
-    // Generate authoritative server-side ID for this client
-    const playerId = "player_" + uuidv4().substr(0, 8);
+    // Generate temporary ID (will be overwritten if reclaiming)
+    let playerId = "player_" + uuidv4().substr(0, 8);
     clients.set(ws, playerId);
     
     console.log(`[CONNECT] Client connected: ${playerId}`);
@@ -115,11 +115,35 @@ wss.on('connection', (ws) => {
         try {
             const data = JSON.parse(message);
             
+            // Reclaim identity if the client was previously connected
+            if (data.type === 'SESSION_RECLAIM') {
+                const oldId = data.playerId;
+                if (GameState.players[oldId]) {
+                    console.log(`[SESSION] Reclaiming session for ${oldId} (removing temp ${playerId})`);
+                    
+                    // Remove the temporary player created for this socket
+                    delete GameState.players[playerId];
+                    
+                    // Bind this socket to the old ID
+                    playerId = oldId;
+                    clients.set(ws, playerId);
+                    
+                    if (data.pseudo) GameState.players[oldId].pseudo = data.pseudo;
+
+                    // Re-send the authoritative state for the reclaimed ID
+                    ws.send(JSON.stringify({
+                        type: 'INIT',
+                        playerId: oldId,
+                        state: GameState
+                    }));
+                }
+                return;
+            }
+
             if (data.type === 'ACTION') {
                 const action = data.action;
                 
-                // --- ANTI-CHEAT: BASIC VALIDATION ---
-                // Enforce that a client can only send actions on behalf of themselves
+                // Allow the player to use their now-authoritative identity
                 if (action.playerId !== playerId) {
                     console.warn(`[SECURITY] Spoofing attempt by ${playerId}: tried to force action for ${action.playerId}`);
                     return;
@@ -135,9 +159,21 @@ wss.on('connection', (ws) => {
 
     // Handle detachment
     ws.on('close', () => {
-        console.log(`[DISCONNECT] Client disconnected: ${playerId}`);
-        delete GameState.players[playerId];
+        console.log(`[DISCONNECT] Client disconnected: ${playerId} (Cleanup pending in 5s)`);
         clients.delete(ws);
+        
+        // Short delay before deleting player to allow for reconnect (session reclaim)
+        const currentId = playerId;
+        setTimeout(() => {
+            // Check if ANY socket is still bound to this playerId
+            let stillConnected = false;
+            clients.forEach(pid => { if (pid === currentId) stillConnected = true; });
+            
+            if (!stillConnected) {
+                console.log(`[CLEANUP] Removing inactive player: ${currentId}`);
+                delete GameState.players[currentId];
+            }
+        }, 5000); // 5 seconds grace period
     });
 });
 
