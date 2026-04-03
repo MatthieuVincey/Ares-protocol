@@ -1140,37 +1140,45 @@
         // Old fbm is now handled by state.biomeSystem.fbm and Biome logic
 
         const RESOURCE_TYPES = {
-            Fer: { color: 0x888888, emissive: 0x222222, size: 0.45, geo: 'box' },
-            Silicium: { color: 0x6699cc, emissive: 0x224488, size: 0.35, geo: 'crystal' },
-            Aluminium: { color: 0xaaccff, emissive: 0x335588, size: 0.4, geo: 'box' }, // New
-            Titane: { color: 0xeebb99, emissive: 0x552211, size: 0.4, geo: 'box' },
-            Cuivre: { color: 0xcc6633, emissive: 0x441100, size: 0.35, geo: 'box' }, // New
-            Nickel: { color: 0x99aa99, emissive: 0x223322, size: 0.4, geo: 'box' }, // New
-            Cobalt: { color: 0x3366ff, emissive: 0x112266, size: 0.35, geo: 'crystal' },
-            Tungstene: { color: 0x555566, emissive: 0x111111, size: 0.45, geo: 'box' }, // New
-            Platine: { color: 0xffffee, emissive: 0x666655, size: 0.3, geo: 'crystal' }, // New
-            Cristal_Energie: { color: 0xff33aa, emissive: 0xaa1155, size: 0.5, geo: 'crystal' }, // New
-            Cristal_Quantique: { color: 0x00ffff, emissive: 0x008888, size: 0.4, geo: 'crystal' }, // New
-            Cristal_Atmo: { color: 0xcc44ff, emissive: 0x661188, size: 0.45, geo: 'crystal' }, // New
-            Iridium: { color: 0xff2200, emissive: 0x880000, size: 0.35, geo: 'crystal' }, // New
-            Methane: { color: 0xaaeeaa, emissive: 0x336633, size: 0.5, geo: 'box' }, // New
-            Eau: { color: 0x33aaff, emissive: 0x114488, size: 0.5, geo: 'box' }, // New
-            Algue_Alien: { color: 0x33ff66, emissive: 0x118822, size: 0.4, geo: 'crystal' }, // New
-            Biomasse_Primitive: { color: 0x88aa44, emissive: 0x334411, size: 0.4, geo: 'box' }, // New
-            Plante_Alien: { color: 0x22ee77, emissive: 0x005522, size: 0.5, geo: 'crystal' }, // New
-            Cristal_Bio: { color: 0xaaff88, emissive: 0x448822, size: 0.35, geo: 'crystal' }, // New
-            Biomasse: { color: 0x668833, emissive: 0x223311, size: 0.4, geo: 'box' }, // New
-            Minerais_Rares: { color: 0xffcc00, emissive: 0x886600, size: 0.35, geo: 'crystal' }, // New
-            Gaz_Rares: { color: 0xdd88ff, emissive: 0x552288, size: 0.4, geo: 'box' }, // New
-            Hydrogene: { color: 0xffffff, emissive: 0x888888, size: 0.4, geo: 'box' }, // New
-            Azote: { color: 0xaaccee, emissive: 0x446688, size: 0.4, geo: 'box' }, // New
-            Glace: { color: 0xaaddff, emissive: 0x224488, size: 0.5, geo: 'crystal' },
-            Artefact: { color: 0xffff00, emissive: 0x888800, size: 0.6, geo: 'crystal' },
-            Or: { color: 0xffcc00, emissive: 0x442200, size: 0.4, geo: 'box' },
-            Scrap: { color: 0xaaaaaa, emissive: 0x222222, size: 0.5, geo: 'box' },
-            Gaz: { color: 0xddffff, emissive: 0xbbddff, size: 0.6, geo: 'sphere' },
-            Cristal: { color: 0xff00ff, emissive: 0x880088, size: 0.35, geo: 'shard' },
-            Verre: { color: 0xaaddff, emissive: 0x4488ff, size: 0.4, geo: 'shard' }
+            // --- ROCK (Minerals & Metals) ---
+            Fer: { category: 'rock', color: 0x444444, emissive: 0x000000, size: 0.6, roughness: 0.9, metalness: 0.4 },
+            Aluminium: { category: 'rock', color: 0xc0c0c0, emissive: 0x000000, size: 0.5, roughness: 0.4, metalness: 0.8 },
+            Titane: { category: 'rock', color: 0x334455, emissive: 0x000000, size: 0.5, roughness: 0.3, metalness: 0.9 },
+            Cuivre: { category: 'rock', color: 0xb87333, emissive: 0x000000, size: 0.5, roughness: 0.6, metalness: 0.7 },
+            Nickel: { category: 'rock', color: 0x889988, emissive: 0x000000, size: 0.5, roughness: 0.5, metalness: 0.6 },
+            Tungstene: { category: 'rock', color: 0x222222, emissive: 0x000000, size: 0.6, roughness: 0.8, metalness: 0.9 },
+            Or: { category: 'rock', color: 0xffd700, emissive: 0x222200, size: 0.4, roughness: 0.2, metalness: 1.0 },
+            
+            // --- CRYSTAL (Translucent/Glowing) ---
+            Silicium: { category: 'crystal', color: 0x44aaff, emissive: 0x112244, size: 0.4, roughness: 0.1, transmission: 0.8 },
+            Cobalt: { category: 'crystal', color: 0x0033ff, emissive: 0x001188, size: 0.4, roughness: 0.2, transmission: 0.6 },
+            Iridium: { category: 'crystal', color: 0xff0033, emissive: 0x880011, size: 0.4, roughness: 0.1, transmission: 0.7 },
+            Platine: { category: 'crystal', color: 0xffffff, emissive: 0x555555, size: 0.35, roughness: 0.0, transmission: 0.9 },
+            Cristal_Energie: { category: 'crystal', color: 0xff00aa, emissive: 0xff00aa, size: 0.5, roughness: 0.2, transmission: 0.5, glow: true },
+            Cristal_Quantique: { category: 'crystal', color: 0x00ffff, emissive: 0x0088ff, size: 0.45, roughness: 0.1, transmission: 0.8, glow: true },
+            Cristal_Atmo: { category: 'crystal', color: 0xcc88ff, emissive: 0x662288, size: 0.5, roughness: 0.3, transmission: 0.7 },
+            Minerais_Rares: { category: 'crystal', color: 0xffcc00, emissive: 0x884400, size: 0.4, roughness: 0.3, transmission: 0.6 },
+            Glace: { category: 'crystal', color: 0xaaeeff, emissive: 0x113355, size: 0.6, roughness: 0.1, transmission: 0.9 },
+            
+            // --- ORGANIC (Soft/Pulsing) ---
+            Algue_Alien: { category: 'organic', color: 0x00ff66, emissive: 0x004411, size: 0.4, roughness: 0.8, pulse: true },
+            Plante_Alien: { category: 'organic', color: 0x55ffaa, emissive: 0x228844, size: 0.5, roughness: 0.7, pulse: true },
+            Biomasse_Primitive: { category: 'organic', color: 0x889933, emissive: 0x223300, size: 0.6, roughness: 0.9 },
+            Cristal_Bio: { category: 'organic', color: 0xaaff55, emissive: 0x33aa11, size: 0.4, roughness: 0.4, pulse: true },
+            Biomasse: { category: 'organic', color: 0x557722, emissive: 0x112200, size: 0.5, roughness: 0.8 },
+            
+            // --- GAS (Particulate/VFX) ---
+            Methane: { category: 'gas', color: 0x66ff66, emissive: 0x228822, size: 0.8 },
+            Azote: { category: 'gas', color: 0xaaccee, emissive: 0x224488, size: 0.8 },
+            Hydrogene: { category: 'gas', color: 0xffffff, emissive: 0xaaaaaa, size: 0.7 },
+            Gaz_Rares: { category: 'gas', color: 0xdd88ff, emissive: 0x8822aa, size: 0.8 },
+            
+            // --- LIQUID ---
+            Eau: { category: 'liquid', color: 0x2288ff, emissive: 0x002266, size: 0.5, transmission: 0.8, roughness: 0.1 },
+            
+            // --- SPECIAL ---
+            Scrap: { category: 'scrap', color: 0x555555, emissive: 0x111111, size: 0.5, metalness: 0.8, roughness: 0.6 },
+            Artefact: { category: 'artifact', color: 0x111111, emissive: 0xffff00, size: 0.6, metalness: 1.0, roughness: 0.1 }
         };
 
         const BUILD_DATA = {
@@ -1626,31 +1634,183 @@
             scene.add(m);
         }
 
-        // Pure visual resource creation (Authoritative Sync)
+        // Procedural Visual Resource Creation (Authoritative Sync)
         function createResourceMesh(resourceId, type, rx, ry, rz, quantity) {
             try {
                 if (!type) return;
                 const d = RESOURCE_TYPES[type];
                 if (!d) return;
 
-                const mat = new THREE.MeshStandardMaterial({
-                    color: d.color,
-                    emissive: d.emissive || 0x000000,
-                    emissiveIntensity: 0.2
-                });
-                const geo = new THREE.BoxGeometry(d.size, d.size, d.size);
-                const m = new THREE.Mesh(geo, mat);
+                const baseGroup = new THREE.Group();
+                let mainMesh;
                 
-                // --- FIXED Y-COORDINATE (Snap to terrain) ---
                 const surfaceY = typeof getTerrainY === 'function' ? getTerrainY(rx, rz) : ry;
-                m.position.set(rx, Math.max(ry, surfaceY + d.size/2), rz);
+                const finalY = Math.max(ry, surfaceY);
                 
-                m.userData = { type: 'resource', rtype: type, resourceId: resourceId };
-                m.castShadow = true; m.receiveShadow = true;
+                baseGroup.position.set(rx, finalY, rz);
+
+                // Common Seed for deterministic randomness based on position
+                const seedRng = () => Math.abs(Math.sin(rx * 12.9898 + rz * 78.233)) * 43758.5453 % 1;
+
+                if (d.category === 'gas') {
+                    // --- GAS: Floating Soft Particles ---
+                    const count = 4 + Math.floor(seedRng() * 3);
+                    const mat = new THREE.MeshBasicMaterial({ 
+                        color: d.color, 
+                        transparent: true, 
+                        opacity: 0.4,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false
+                    });
+                    
+                    for(let i=0; i<count; i++) {
+                        const sGeo = new THREE.SphereGeometry(d.size * (0.5 + seedRng() * 0.5), 8, 8);
+                        const p = new THREE.Mesh(sGeo, mat);
+                        p.position.set((seedRng()-0.5)*d.size, (seedRng()*d.size) + d.size, (seedRng()-0.5)*d.size);
+                        p.userData = { offset: seedRng() * Math.PI * 2, speed: 0.5 + seedRng(), ox: p.position.x, oy: p.position.y, oz: p.position.z };
+                        baseGroup.add(p);
+                    }
+                    baseGroup.position.y += d.size; // Float above ground slightly
+                    
+                } else {
+                    // --- SOLID OBJECTS (Rocks, Crystals, Organics, Scrap, Artifacts, Liquids) ---
+                    let geo, mat;
+                    
+                    if (d.category === 'rock') {
+                        // Irregular rocky shape using low-poly Dodecahedron
+                        geo = new THREE.DodecahedronGeometry(d.size, 0);
+                        // Jitter vertices for natural look
+                        const pos = geo.attributes.position;
+                        for(let i=0; i<pos.count; i++) {
+                            pos.setXYZ(i, pos.getX(i) * (0.8 + seedRng()*0.4), pos.getY(i) * (0.8 + seedRng()*0.4), pos.getZ(i) * (0.8 + seedRng()*0.4));
+                        }
+                        geo.computeVertexNormals();
+                        
+                        mat = new THREE.MeshStandardMaterial({
+                            color: d.color,
+                            roughness: d.roughness || 0.8,
+                            metalness: d.metalness || 0.2
+                        });
+                        
+                    } else if (d.category === 'crystal') {
+                        // Pointy crystal cluster
+                        geo = new THREE.ConeGeometry(d.size * 0.6, d.size * 2, 5 + Math.floor(seedRng()*3));
+                        
+                        mat = new THREE.MeshPhysicalMaterial({
+                            color: d.color,
+                            emissive: d.emissive || 0x000000,
+                            emissiveIntensity: d.glow ? 0.8 : 0.2,
+                            transparent: true,
+                            opacity: d.transmission || 0.9,
+                            roughness: d.roughness || 0.1,
+                            metalness: 0.1,
+                            transmission: d.transmission || 0, // Glass-like if supported
+                            thickness: d.size
+                        });
+                        
+                        // Add some smaller offshoot crystals
+                        const subCount = 1 + Math.floor(seedRng() * 2);
+                        for(let i=0; i<subCount; i++) {
+                            const subMesh = new THREE.Mesh(geo.clone(), mat);
+                            subMesh.scale.setScalar(0.4 + seedRng()*0.3);
+                            subMesh.rotation.set((seedRng()-0.5)*2, seedRng()*Math.PI, (seedRng()-0.5)*2);
+                            subMesh.position.set((seedRng()-0.5)*d.size*0.5, 0, (seedRng()-0.5)*d.size*0.5);
+                            baseGroup.add(subMesh);
+                        }
+
+                    } else if (d.category === 'organic') {
+                        // Soft, blobby shape
+                        geo = new THREE.SphereGeometry(d.size, 16, 12);
+                        const pos = geo.attributes.position;
+                        for(let i=0; i<pos.count; i++) {
+                            // Organic warps
+                            const nz = Math.sin(pos.getY(i) * 5 + seedRng()*10) * 0.1;
+                            pos.setXYZ(i, pos.getX(i)*(1+nz), pos.getY(i), pos.getZ(i)*(1+nz));
+                        }
+                        geo.computeVertexNormals();
+                        
+                        mat = new THREE.MeshStandardMaterial({
+                            color: d.color,
+                            emissive: d.emissive || 0x000000,
+                            emissiveIntensity: d.pulse ? 0.5 : 0.1,
+                            roughness: d.roughness || 0.8,
+                            metalness: 0
+                        });
+                        
+                    } else if (d.category === 'artifact') {
+                        // Strange, unnatural geometric structure
+                        geo = new THREE.TorusKnotGeometry(d.size*0.5, d.size*0.15, 64, 8, Math.floor(2+seedRng()*3), Math.floor(3+seedRng()*4));
+                        mat = new THREE.MeshStandardMaterial({
+                            color: 0x111111,
+                            emissive: d.emissive || 0xddaa00,
+                            emissiveIntensity: 0.5,
+                            roughness: 0.1,
+                            metalness: 1.0,
+                            wireframe: seedRng() > 0.5 // Sometimes wireframe for sci-fi look
+                        });
+                        baseGroup.position.y += d.size; // Levitating
+
+                    } else if (d.category === 'scrap') {
+                        geo = new THREE.BoxGeometry(d.size, d.size*0.4, d.size*1.2);
+                        mat = new THREE.MeshStandardMaterial({ color: d.color, roughness: 0.7, metalness: 0.8 });
+                        // Add a pipe sticking out
+                        const pipe = new THREE.Mesh(new THREE.CylinderGeometry(d.size*0.1, d.size*0.1, d.size*1.5), mat);
+                        pipe.rotation.set(seedRng(), seedRng(), seedRng());
+                        baseGroup.add(pipe);
+                        
+                    } else if (d.category === 'liquid') {
+                        geo = new THREE.CylinderGeometry(d.size*1.5, d.size*1.5, d.size*0.2, 16);
+                        mat = new THREE.MeshPhysicalMaterial({
+                            color: d.color,
+                            transparent: true,
+                            opacity: 0.8,
+                            roughness: 0.1,
+                            metalness: 0.1
+                        });
+                        baseGroup.position.y -= d.size * 0.4; // Sunk into ground
+                    } else {
+                        // Fallback Box
+                        geo = new THREE.BoxGeometry(d.size, d.size, d.size);
+                        mat = new THREE.MeshStandardMaterial({ color: d.color });
+                    }
+
+                    mainMesh = new THREE.Mesh(geo, mat);
+                    
+                    // Rotate organically
+                    if (d.category !== 'liquid' && d.category !== 'artifact') {
+                        mainMesh.rotation.set(seedRng()*Math.PI, seedRng()*Math.PI, seedRng()*Math.PI);
+                    }
+                    
+                    // Specific Offset
+                    if (d.category !== 'liquid') {
+                        mainMesh.position.y = d.size / 2;
+                    }
+                    
+                    mainMesh.castShadow = true;
+                    mainMesh.receiveShadow = true;
+                    baseGroup.add(mainMesh);
+                }
+
+                // Add bounding box for raycasting (since the group contains complex/multiple meshes)
+                const hitBoxGeo = new THREE.BoxGeometry(d.size*2, d.size*2, d.size*2);
+                const hitBoxMat = new THREE.MeshBasicMaterial({visible: false});
+                const hitBox = new THREE.Mesh(hitBoxGeo, hitBoxMat);
+                hitBox.position.y = d.size;
                 
-                scene.add(m);
-                state.resourceMeshes.set(resourceId, m);
-                return m;
+                // CRITICAL: Raycaster interact targets this specific property pattern
+                hitBox.userData = { type: 'resource', rtype: type, resourceId: resourceId };
+                baseGroup.add(hitBox);
+                
+                // Add the Group context to state so we know what to animate/sync
+                baseGroup.userData = { type: 'resource_group', category: d.category, hitBox: hitBox, params: d };
+
+                scene.add(baseGroup);
+                
+                // Store the GROUP in resourceMeshes for easy deletion of everything
+                // Raycaster logic in tryInteract will need to look deeper for resourceId
+                state.resourceMeshes.set(resourceId, baseGroup); 
+                
+                return baseGroup;
             } catch (e) { console.error("Resource Mesh Fail:", e); }
         }
 
@@ -1659,7 +1819,7 @@
             if (!state.started) return;
 
             // 1. Sync Resources
-            const sRes = GameState.resources;
+            const sRes = GameState.resources || {}; // Safe access for light sync
             
             // Create missing meshes
             for (const id in sRes) {
@@ -1669,11 +1829,50 @@
                 }
             }
             
-            // Remove extra meshes
+            // Remove extra groups/meshes
+            // Note: In light-sync mode, we rely on RESOURCE_REMOVED events from networkSystem.js
+            // But we still keep this as a fallback for the initial sync.
             state.resourceMeshes.forEach((mesh, id) => {
                 if (!sRes[id]) {
-                    scene.remove(mesh);
-                    state.resourceMeshes.delete(id);
+                    // Only delete if we are in a 'full sync' state or if the server explicitly confirmed deletion
+                    // In current light-sync, sRes would be empty, so we must be careful not to delete EVERYTHING.
+                    // Instead, networkSystem.js handles individual deletions.
+                }
+            });
+        }
+
+        function updateResourceAnimations(dt) {
+            const time = Date.now() * 0.001;
+            state.resourceMeshes.forEach((group, id) => {
+                // If it's a group (new procedural system)
+                if (group.type === 'Group' || (group.userData && group.userData.type === 'resource_group')) {
+                    const u = group.userData;
+                    
+                    if (u.category === 'gas') {
+                        // Float gas particles
+                        group.children.forEach(p => {
+                            if (p.userData && p.userData.offset !== undefined) {
+                                p.position.y = p.userData.oy + Math.sin(time * p.userData.speed + p.userData.offset) * 0.2;
+                                p.position.x = p.userData.ox + Math.cos(time * 0.5 + p.userData.offset) * 0.1;
+                            }
+                        });
+                    } else if (u.category === 'crystal' && u.params.glow) {
+                        // Pulse crystal emission
+                        const intensity = 0.5 + Math.sin(time * 3) * 0.5;
+                        group.children.forEach(c => {
+                            if (c.material && c.material.emissiveIntensity !== undefined) {
+                                c.material.emissiveIntensity = intensity;
+                            }
+                        });
+                    } else if (u.category === 'artifact') {
+                        // Slowly spin and float artifacts
+                        group.rotation.y += dt * 0.5;
+                        group.position.y += Math.sin(time * 2) * 0.005;
+                    } else if (u.params && u.params.pulse) {
+                        // Scale organic blobs
+                        const s = 1.0 + Math.sin(time * 2) * 0.05;
+                        group.scale.set(s, s, s);
+                    }
                 }
             });
         }
@@ -3113,12 +3312,15 @@
             // When in a rover, the pickup radius is much larger
             const pickupDist = state.player.inRover ? 12 : 6;
 
-            const hits = raycaster.intersectObjects(Array.from(state.resourceMeshes.values()), false);
+            const hits = raycaster.intersectObjects(Array.from(state.resourceMeshes.values()), true); // MUST BE RECURSIVE FOR GROUPS
             if (hits.length > 0 && hits[0].distance < pickupDist) {
-                const obj = hits[0].object;
-                const type = obj.userData.rtype;
-                const resourceId = obj.userData.resourceId;
+                const hitObj = hits[0].object;
+                // Look for resourceId in the object itself (hitbox) or its parent (group)
+                const resourceId = hitObj.userData.resourceId || (hitObj.parent && hitObj.parent.userData.resourceId);
+                const type = hitObj.userData.rtype || (hitObj.parent && hitObj.parent.userData.rtype);
                 
+                if (!resourceId) return;
+
                 // ACTION: Collect Resource (Server Authority)
                 window.sendAction({
                     type: 'COLLECT_RESOURCE',
@@ -3128,9 +3330,12 @@
                 });
                 
                 // --- CLIENT-SIDE PREDICTION (Instant Feedback) ---
-                // 1. Remove the mesh immediately
-                scene.remove(obj);
-                state.resourceMeshes.delete(resourceId);
+                // 1. Remove the entire group immediately
+                const group = state.resourceMeshes.get(resourceId);
+                if (group) {
+                    scene.remove(group);
+                    state.resourceMeshes.delete(resourceId);
+                }
                 
                 // 2. Update the Inventory HUD immediately
                 if (typeof updateInvUI === 'function') updateInvUI();
@@ -4057,6 +4262,7 @@
 
                 // --- NEW: Sync Visuals from authoritative GameState ---
                 if (typeof syncGameStateVisuals === 'function') syncGameStateVisuals();
+                if (typeof updateResourceAnimations === 'function') updateResourceAnimations(dt);
 
                 // --- HUD & Interaction ---
                 updateInteraction();

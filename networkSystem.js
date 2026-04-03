@@ -123,6 +123,12 @@ class NetworkSystem {
         else if (message.type === 'STATE_UPDATE') {
             this.syncFromServer(message.state);
         }
+        else if (message.type === 'RESOURCE_REMOVED') {
+            const id = message.resourceId;
+            if (window.GameState.resources[id]) {
+                delete window.GameState.resources[id];
+            }
+        }
     }
 
     hardSyncState(serverState) {
@@ -222,17 +228,19 @@ class NetworkSystem {
             if (!serverState.machines[id]) delete localState.machines[id];
         }
 
-        // 4. Sync Resources
-        for (const id in serverState.resources) {
-            if (!localState.resources[id]) {
-                const sr = serverState.resources[id];
-                localState.resources[id] = new window.ResourceData(id, sr.type, sr.pos.x, sr.pos.y, sr.pos.z, sr.quantity);
-            } else {
-                localState.resources[id].quantity = serverState.resources[id].quantity;
+        // 4. Sync Resources (ONLY if present in message - Memory Optimization)
+        if (serverState.resources) {
+            for (const id in serverState.resources) {
+                if (!localState.resources[id]) {
+                    const sr = serverState.resources[id];
+                    localState.resources[id] = new window.ResourceData(id, sr.type, sr.pos.x, sr.pos.y, sr.pos.z, sr.quantity);
+                } else {
+                    localState.resources[id].quantity = serverState.resources[id].quantity;
+                }
             }
-        }
-        for (const id in localState.resources) {
-            if (!serverState.resources[id]) delete localState.resources[id];
+            for (const id in localState.resources) {
+                if (!serverState.resources[id]) delete localState.resources[id];
+            }
         }
 
         for (const id in localState.resources) {

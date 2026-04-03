@@ -151,6 +151,18 @@ wss.on('connection', (ws) => {
                 
                 // Execute the action authoritatively on the server
                 applyAction(action);
+                
+                // --- SPECIAL BROADCAST FOR MEMORY OPTIMIZATION ---
+                // If a resource was collected, tell everyone to remove it locally
+                if (action.type === 'COLLECT_RESOURCE') {
+                    const removePayload = JSON.stringify({
+                        type: 'RESOURCE_REMOVED',
+                        resourceId: action.resourceId
+                    });
+                    wss.clients.forEach(client => {
+                        if (client.readyState === WebSocket.OPEN) client.send(removePayload);
+                    });
+                }
             }
         } catch (err) {
             console.error(`[ERROR] Failed to parse message from ${playerId}:`, err);
@@ -178,13 +190,17 @@ wss.on('connection', (ws) => {
 });
 
 // 4. TICKRATE ENGINE (Authoritative State Broadcaster)
-const TICK_RATE = 20; // 20 Updates Per Second (50ms interval)
+const TICK_RATE = 10; // Optimized to 10 Updates Per Second to avoid Render OOM
 
 setInterval(() => {
-    // Send universal state pulse to all connected clients
+    // Send light universal state pulse (WITHOUT the massive 4000 resources list)
+    // This saves ~95% of server memory and CPU during JSON stringification
+    const lightGameState = { ...GameState };
+    delete lightGameState.resources; // Important: Do not send resources in the high-frequency loop
+
     const syncPayload = JSON.stringify({
         type: 'STATE_UPDATE',
-        state: GameState
+        state: lightGameState
     });
     
     wss.clients.forEach((client) => {
