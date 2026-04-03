@@ -3117,16 +3117,24 @@
             if (hits.length > 0 && hits[0].distance < pickupDist) {
                 const obj = hits[0].object;
                 const type = obj.userData.rtype;
+                const resourceId = obj.userData.resourceId;
                 
                 // ACTION: Collect Resource (Server Authority)
                 window.sendAction({
                     type: 'COLLECT_RESOURCE',
                     playerId: window.localPlayerId,
-                    resourceId: obj.userData.resourceId,
+                    resourceId: resourceId,
                     amount: 1
                 });
                 
-                // updateInvUI(); // Will be handled by the next STATE_UPDATE
+                // --- CLIENT-SIDE PREDICTION (Instant Feedback) ---
+                // 1. Remove the mesh immediately
+                scene.remove(obj);
+                state.resourceMeshes.delete(resourceId);
+                
+                // 2. Update the Inventory HUD immediately
+                if (typeof updateInvUI === 'function') updateInvUI();
+                
                 showMsg(`+ 1 ${type}`);
 
                 // Harvesting resources angers the planet
