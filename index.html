@@ -1278,6 +1278,7 @@
         
         // Legacy arrays (temporarily separate until refactored)
         window.state.buildings = []; 
+        window.state.buildingMeshes = new Map(); // Track machineId -> Mesh
         window.state.resourceMeshes = new Map(); // Use Map exclusively
         window.state.wallColliders = [];
 
@@ -1829,7 +1830,46 @@
                 }
             }
             
-            // Remove extra groups/meshes
+            // 2. Sync Machines (Multiplayer Buildings)
+            const sMach = GameState.machines || {};
+            let needsRecalc = false;
+            for (const id in sMach) {
+                if (!state.buildingMeshes.has(id)) {
+                    const m = sMach[id];
+                    const mesh = createBuildingMesh(m.type, false);
+                    mesh.position.set(m.pos.x, m.pos.y, m.pos.z);
+                    mesh.rotation.y = m.rotationY;
+                    if (!mesh.userData) mesh.userData = {};
+                    mesh.userData.machineId = id;
+                    mesh.userData.btype = m.type;
+                    
+                    scene.add(mesh);
+                    state.buildings.push(mesh);
+                    state.buildingMeshes.set(id, mesh);
+                    
+                    // Special case for modules
+                    const d = BUILD_DATA[m.type];
+                    if (d && d.isModule) {
+                        updateTerrainUnderBuilding(mesh);
+                        updateAllModuleWalls();
+                    }
+                    needsRecalc = true;
+                }
+            }
+
+            // Cleanup removed machines
+            state.buildingMeshes.forEach((mesh, id) => {
+                if (!sMach[id]) {
+                    scene.remove(mesh);
+                    state.buildingMeshes.delete(id);
+                    state.buildings = state.buildings.filter(b => b !== mesh);
+                    needsRecalc = true;
+                }
+            });
+
+            if (needsRecalc && typeof recalcTerra === 'function') recalcTerra();
+
+            // 3. Remove extra groups/meshes (Resources)
             // Note: In light-sync mode, we rely on RESOURCE_REMOVED events from networkSystem.js
             // But we still keep this as a fallback for the initial sync.
             state.resourceMeshes.forEach((mesh, id) => {
@@ -2613,6 +2653,7 @@
             
             scene.add(mesh);
             state.buildings.push(mesh);
+            state.buildingMeshes.set(machineId, mesh);
             
             // ACTION: Register in GameState
             window.sendAction({
