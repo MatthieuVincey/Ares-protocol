@@ -57,7 +57,9 @@ globalScope.PlayerData = class PlayerData {
         this.hp = 100;
         this.energy = 100;
         this.inventory = {
-            // ... (inventory preserved)
+            Fer: 20, Aluminium: 20, Silicium: 20, Cuivre: 20, Titane: 20, 
+            Eau: 20, Biomasse: 20, Silice: 20, Nickel: 20, Cobalt: 20,
+            Platine: 20, Uranium: 20, Iridium: 20, Tungstene: 20
         };
         this.pos = new THREE.Vector3(0, 10, 0);
         this.rotation = new THREE.Euler(0, 0, 0);

@@ -192,8 +192,11 @@ class NetworkSystem {
             
             if (id === window.localPlayerId) {
                 // LOCAL PLAYER: Trust client-side predicted position/rotation. 
-                // Only sync server-authoritative logic like inventory.
-                lp.inventory = sp.inventory || {};
+                // Only sync server-authoritative logic like inventory IF it was sent.
+                // We also check if it's not empty, to avoid accidental overwrites during light sync.
+                if (sp.inventory && Object.keys(sp.inventory).length > 0) {
+                    lp.inventory = sp.inventory;
+                }
             } else {
                 // REMOTE PLAYER: Set up LERP target for smooth interpolation
                 if (!lp.targetPos) lp.targetPos = new THREE.Vector3();
