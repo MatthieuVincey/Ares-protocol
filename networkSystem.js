@@ -30,17 +30,39 @@ class NetworkSystem {
             this.connected = true;
             this.overrideActionSystem();
 
-            // After connecting, check if we have a stored session to reclaim
+            // We no longer automatically reclaim session on global connect, 
+            // since players now need to intentionally join a room.
+            // If they are in-game and disconnect, we COULD auto-rejoin the room if we stored it:
             const storedId = localStorage.getItem('ares_player_id');
-            if (storedId) {
-                console.log(`[NETWORK] Attempting to reclaim session: ${storedId}`);
+            const storedRoom = localStorage.getItem('ares_room_id');
+            if (storedId && storedRoom && window.state && window.state.started) {
+                console.log(`[NETWORK] Attempting to reconnect to room: ${storedRoom}`);
                 this.socket.send(JSON.stringify({ 
-                    type: 'SESSION_RECLAIM', 
-                    playerId: storedId,
+                    type: 'JOIN_ROOM', 
+                    roomId: storedRoom,
                     pseudo: window.localPlayerPseudo 
                 }));
             }
         };
+
+    createRoom() {
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify({
+                type: 'CREATE_ROOM',
+                pseudo: window.localPlayerPseudo
+            }));
+        }
+    }
+
+    joinRoom(roomId) {
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify({
+                type: 'JOIN_ROOM',
+                roomId: roomId,
+                pseudo: window.localPlayerPseudo
+            }));
+        }
+    }
 
         this.socket.onmessage = (event) => {
             try {
@@ -81,6 +103,24 @@ class NetworkSystem {
     }
 
     handleMessage(message) {
+        if (message.type === 'ROOM_JOINED') {
+            window.currentRoomId = message.roomId;
+            localStorage.setItem('ares_room_id', message.roomId);
+            console.log(`[NETWORK] Joined room successfully: ${message.roomId}`);
+            
+            // Trigger UI update (hooked into index.html)
+            if (typeof window.onRoomJoined === 'function') {
+                window.onRoomJoined(message.roomId);
+            }
+        }
+
+        if (message.type === 'JOIN_ERROR') {
+            console.error(`[NETWORK] Failed to join room: ${message.message}`);
+            if (typeof window.onJoinError === 'function') {
+                window.onJoinError(message.message);
+            }
+        }
+
         if (message.type === 'INIT') {
             console.log(`[NETWORK] INIT received. My Server ID is: ${message.playerId}`);
             const oldId = window.localPlayerId;

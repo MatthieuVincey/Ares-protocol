@@ -23,28 +23,32 @@ if (typeof globalScope.THREE === 'undefined') {
     };
 }
 
-globalScope.GameState = {
-    players: {},    // { [playerId]: PlayerData }
-    machines: {},   // { [machineId]: MachineData }
-    resources: {},  // { [resourceId]: ResourceData }
-    world: {        // Global planet state
-        oxygen: 0,
-        temp: -60,
-        pressure: 0,
-        o2Rate: 0,
-        heatRate: 0,
-        pressRate: 0,
-        stage: 0,
-        flora: []
-    },
-    upgrades: {
-        jetpack_tank: 0,
-        jetpack_thrust: 0,
-        drill_efficiency: 0,
-        solar_efficiency: 0
-    },
-    energy: { production: 0, consumption: 0, stored: 0, maxStorage: 0, ratio: 1.0, status: 'OK' }
+globalScope.createGameState = function() {
+    return {
+        players: {},    // { [playerId]: PlayerData }
+        machines: {},   // { [machineId]: MachineData }
+        resources: {},  // { [resourceId]: ResourceData }
+        world: {        // Global planet state
+            oxygen: 0,
+            temp: -60,
+            pressure: 0,
+            o2Rate: 0,
+            heatRate: 0,
+            pressRate: 0,
+            stage: 0,
+            flora: []
+        },
+        upgrades: {
+            jetpack_tank: 0,
+            jetpack_thrust: 0,
+            drill_efficiency: 0,
+            solar_efficiency: 0
+        },
+        energy: { production: 0, consumption: 0, stored: 0, maxStorage: 0, ratio: 1.0, status: 'OK' }
+    };
 };
+
+globalScope.GameState = globalScope.createGameState();
 
 // Unique ID for the current local player
 globalScope.localPlayerId = "player_" + Math.random().toString(36).substr(2, 9);
@@ -125,14 +129,15 @@ globalScope.onReceiveAction = function(action) {
     globalScope.applyAction(action);
 }
 
-globalScope.applyAction = function(action) {
+globalScope.applyAction = function(action, targetState = globalScope.GameState) {
     // --- ACTION LOGGING ---
     // Ignore spammy updates for cleaner logs
     if (action.type !== 'PLAYER_MOVE' && action.type !== 'UPDATE_TERRAFORMING' && action.type !== 'UPDATE_PLAYER_STATS' && action.type !== 'UPDATE_ENERGY') {
         let color = '#aaa';
         if (action.type.includes('MACHINE')) color = '#ffaa00';
         else if (action.type.includes('RESOURCE')) color = '#00aaff';
-        console.log(`%c[ACTION] ${action.type} by ${action.playerId || 'SERVER'}`, `color: ${color}; font-weight: bold;`, action);
+        // Only log action basics to keep console clean, avoid logging full targetState
+        console.log(`%c[ACTION] ${action.type} by ${action.playerId || 'SERVER'}`, `color: ${color}; font-weight: bold;`);
     }
 
     switch (action.type) {
@@ -142,7 +147,7 @@ globalScope.applyAction = function(action) {
             // The local player already updates their position predictively in the game loop.
             if (action.playerId === globalScope.localPlayerId) break;
 
-            const player = globalScope.GameState.players[action.playerId];
+            const player = targetState.players[action.playerId];
             if (player) {
                 player.pos.set(action.position.x, action.position.y, action.position.z);
                 player.velocity.set(action.velocity.x, action.velocity.y, action.velocity.z);
@@ -157,7 +162,7 @@ globalScope.applyAction = function(action) {
 
         // --- MACHINES ---
         case 'PLACE_MACHINE': {
-            if (globalScope.GameState.machines[action.machineId]) {
+            if (targetState.machines[action.machineId]) {
                 console.warn(`%c[CONFLIT] Machine ${action.machineId} (ID Collision)`, `color: #ff0000; font-weight: bold;`);
                 break;
             }
@@ -170,24 +175,24 @@ globalScope.applyAction = function(action) {
                 action.rotationY, 
                 action.playerId
             );
-            globalScope.GameState.machines[action.machineId] = machine;
+            targetState.machines[action.machineId] = machine;
             break;
         }
 
         case 'REMOVE_MACHINE': {
-            delete globalScope.GameState.machines[action.machineId];
+            delete targetState.machines[action.machineId];
             break;
         }
 
         // --- WORLD RESOURCES ---
         case 'COLLECT_RESOURCE': {
-            const resource = globalScope.GameState.resources[action.resourceId];
+            const resource = targetState.resources[action.resourceId];
             if (resource) {
                 resource.quantity -= action.amount;
                 if (resource.quantity <= 0) {
-                    delete globalScope.GameState.resources[action.resourceId];
+                    delete targetState.resources[action.resourceId];
                 }
-                const player = globalScope.GameState.players[action.playerId];
+                const player = targetState.players[action.playerId];
                 if (player) {
                     player.inventory[resource.type] = (player.inventory[resource.type] || 0) + action.amount;
                 }
@@ -198,7 +203,7 @@ globalScope.applyAction = function(action) {
         }
 
         case 'SPAWN_RESOURCE': {
-            globalScope.GameState.resources[action.resourceId] = new globalScope.ResourceData(
+            targetState.resources[action.resourceId] = new globalScope.ResourceData(
                 action.resourceId,
                 action.resourceType,
                 action.position.x,
@@ -211,7 +216,7 @@ globalScope.applyAction = function(action) {
 
         // --- PLAYER STATS ---
         case 'UPDATE_PLAYER_STATS': {
-            const player = globalScope.GameState.players[action.playerId];
+            const player = targetState.players[action.playerId];
             if (player) {
                 if (action.hp !== undefined) player.hp = action.hp;
                 if (action.o2 !== undefined) player.o2 = action.o2;
@@ -222,7 +227,7 @@ globalScope.applyAction = function(action) {
 
         // --- CUSTOMIZATION ---
         case 'UPDATE_PSEUDO': {
-            const player = globalScope.GameState.players[action.playerId];
+            const player = targetState.players[action.playerId];
             if (player && action.pseudo) {
                 player.pseudo = action.pseudo;
             }
@@ -231,23 +236,23 @@ globalScope.applyAction = function(action) {
 
         // --- TERRAFORMING / ENERGY ---
         case 'UPDATE_TERRAFORMING': {
-            globalScope.GameState.world.oxygen = action.oxygen;
-            globalScope.GameState.world.temp = action.temp;
-            globalScope.GameState.world.pressure = action.pressure;
-            globalScope.GameState.world.o2Rate = action.o2Rate;
-            globalScope.GameState.world.heatRate = action.heatRate;
-            globalScope.GameState.world.pressRate = action.pressRate;
-            globalScope.GameState.world.stage = action.stage;
+            targetState.world.oxygen = action.oxygen;
+            targetState.world.temp = action.temp;
+            targetState.world.pressure = action.pressure;
+            targetState.world.o2Rate = action.o2Rate;
+            targetState.world.heatRate = action.heatRate;
+            targetState.world.pressRate = action.pressRate;
+            targetState.world.stage = action.stage;
             break;
         }
 
         case 'UPDATE_ENERGY': {
-            globalScope.GameState.energy.production = action.production;
-            globalScope.GameState.energy.consumption = action.consumption;
-            globalScope.GameState.energy.stored = action.stored;
-            globalScope.GameState.energy.maxStorage = action.maxStorage;
-            globalScope.GameState.energy.ratio = action.ratio;
-            globalScope.GameState.energy.status = action.status;
+            targetState.energy.production = action.production;
+            targetState.energy.consumption = action.consumption;
+            targetState.energy.stored = action.stored;
+            targetState.energy.maxStorage = action.maxStorage;
+            targetState.energy.ratio = action.ratio;
+            targetState.energy.status = action.status;
             break;
         }
         
