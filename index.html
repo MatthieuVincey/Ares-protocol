@@ -928,8 +928,23 @@
     <div id="title-screen">
         <h1>ARES PROTOCOL</h1>
         <p>MISSION MULTIJOUEUR</p>
-        <input type="text" id="player-pseudo" placeholder="Entrez votre pseudonyme..." maxlength="16" autocomplete="off" />
-        <button class="start-btn" id="start-btn">▶ COMMENCER</button>
+        
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; max-width: 300px;">
+            <input type="text" id="player-pseudo" placeholder="Votre pseudonyme..." maxlength="16" autocomplete="off" />
+            
+            <button class="start-btn" id="create-btn">🛠️ CRÉER UNE PARTIE</button>
+            
+            <div class="room-divider">OU REJOINDRE</div>
+            
+            <input type="text" id="room-code-input" placeholder="CODE DU SALON" maxlength="6" style="text-transform: uppercase; text-align: center; font-weight: bold; font-family: monospace; letter-spacing: 4px; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.2); color: #fff; padding: 10px; border-radius: 4px; width: 100%; outline: none;" />
+            <button class="start-btn" id="join-btn" style="border-color: #00d4ff; color: #00d4ff;">🚀 REJOINDRE</button>
+            
+            <div id="room-error" style="color: #ff4444; font-size: 12px; height: 14px; margin-top: 5px;"></div>
+        </div>
+        
+        <div id="diag-status" style="margin-top: 30px; font-size: 10px; font-family: monospace; opacity: 0.4;">
+            RÉSEAU: ANALYSE... | MOTEUR: OK
+        </div>
     </div>
 
     <!-- Death Screen -->
@@ -967,6 +982,10 @@
         <button class="close-btn" id="tech-close" style="margin-top:16px">FERMER [T]</button>
     </div>
     <div id="hud">
+        <!-- Room Info (HUD) -->
+        <div id="hud-room-info" style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); border: 1px solid rgba(0,212,255,0.4); border-radius: 6px; padding: 8px 16px; font-size: 13px; color: #00d4ff; letter-spacing: 2px; text-align: center; display: none; backdrop-filter: blur(4px);">
+            ID SALON: <span id="hud-room-code" style="font-weight: bold; color: #fff;">------</span>
+        </div>
 
 
         <!-- Biome Info -->
