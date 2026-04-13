@@ -43,6 +43,8 @@ class NetworkSystem {
                     pseudo: window.localPlayerPseudo 
                 }));
             }
+        };
+
         this.socket.onmessage = (event) => {
             try {
                 const message = JSON.parse(event.data);
