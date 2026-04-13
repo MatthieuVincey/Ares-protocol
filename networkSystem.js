@@ -85,6 +85,15 @@ class NetworkSystem {
         }
     }
 
+    sendChat(text) {
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify({
+                type: 'CHAT',
+                message: text
+            }));
+        }
+    }
+
     overrideActionSystem() {
         // Override the local simulated sendAction from multiplayerSystem.js
         window.sendAction = (action) => {
@@ -167,6 +176,16 @@ class NetworkSystem {
             const id = message.resourceId;
             if (window.GameState.resources[id]) {
                 delete window.GameState.resources[id];
+            }
+        }
+        else if (message.type === 'CHAT') {
+            if (typeof window.appendChatMessage === 'function') {
+                window.appendChatMessage(message);
+            }
+        }
+        else if (message.type === 'CHAT_HISTORY') {
+            if (typeof window.loadChatHistory === 'function') {
+                window.loadChatHistory(message.chat);
             }
         }
     }

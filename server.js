@@ -154,7 +154,7 @@ const clients = new Map();
 wss.on('connection', (ws) => {
     // Generate temporary ID
     let playerId = "player_" + uuidv4().substr(0, 8);
-    let clientData = { playerId: playerId, roomId: null };
+    let clientData = { playerId: playerId, roomId: null, lastChatTime: 0 };
     clients.set(ws, clientData);
     
     console.log(`[CONNECT] Client connected: ${playerId}`);
@@ -168,7 +168,7 @@ wss.on('connection', (ws) => {
                 const newGameState = createGameState();
                 seedWorldForRoom(newGameState);
                 
-                rooms.set(roomCode, { id: roomCode, gameState: newGameState, createdAt: Date.now() });
+                rooms.set(roomCode, { id: roomCode, gameState: newGameState, createdAt: Date.now(), chat: [] });
                 saveRoom(roomCode, newGameState); // Immediate initial save
                 
                 // Add player to room
@@ -180,6 +180,7 @@ wss.on('connection', (ws) => {
 
                 ws.send(JSON.stringify({ type: 'ROOM_JOINED', roomId: roomCode }));
                 ws.send(JSON.stringify({ type: 'INIT', playerId: clientData.playerId, state: newGameState }));
+                ws.send(JSON.stringify({ type: 'CHAT_HISTORY', chat: [] }));
                 return;
             }
 
@@ -191,7 +192,7 @@ wss.on('connection', (ws) => {
                 if (!room) {
                     const loadedState = loadRoomSave(roomCode);
                     if (loadedState) {
-                        room = { id: roomCode, gameState: loadedState, createdAt: Date.now() };
+                        room = { id: roomCode, gameState: loadedState, createdAt: Date.now(), chat: [] };
                         rooms.set(roomCode, room);
                     }
                 }
@@ -205,6 +206,7 @@ wss.on('connection', (ws) => {
 
                     ws.send(JSON.stringify({ type: 'ROOM_JOINED', roomId: roomCode }));
                     ws.send(JSON.stringify({ type: 'INIT', playerId: clientData.playerId, state: room.gameState }));
+                    ws.send(JSON.stringify({ type: 'CHAT_HISTORY', chat: room.chat }));
                     
                     saveRoom(roomCode, room.gameState); // Inform the file that a player connected
                 } else {
@@ -219,9 +221,39 @@ wss.on('connection', (ws) => {
             if (!room) return;
             
             if (data.type === 'SESSION_RECLAIM') {
-                // Reclaim handles reconnects to the SAME room
-                // Wait, if we use a room system, the client must know the roomId and send it in reclaim.
-                // Simpler: if they drop connection, they go back to menu, or we allow reclaim if they pass the room ID.
+                return;
+            }
+
+            if (data.type === 'CHAT') {
+                const now = Date.now();
+                if (now - clientData.lastChatTime < 1000) return; // Anti-spam 1s
+                
+                let text = (data.message || "").trim();
+                if (text.length === 0) return;
+                if (text.length > 100) text = text.substring(0, 100);
+                
+                clientData.lastChatTime = now;
+                const player = room.gameState.players[clientData.playerId];
+                const pseudo = player && player.pseudo ? player.pseudo : "Astronaute";
+                
+                const chatMsg = {
+                    type: 'CHAT',
+                    playerId: clientData.playerId,
+                    pseudo: pseudo,
+                    message: text,
+                    timestamp: now
+                };
+                
+                room.chat.push(chatMsg);
+                if (room.chat.length > 50) room.chat.shift();
+                
+                const payload = JSON.stringify(chatMsg);
+                wss.clients.forEach(client => {
+                    const cData = clients.get(client);
+                    if (cData && cData.roomId === clientData.roomId && client.readyState === WebSocket.OPEN) {
+                        client.send(payload);
+                    }
+                });
                 return;
             }
 
