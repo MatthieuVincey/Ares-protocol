@@ -43,27 +43,6 @@ class NetworkSystem {
                     pseudo: window.localPlayerPseudo 
                 }));
             }
-        };
-
-    createRoom() {
-        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            this.socket.send(JSON.stringify({
-                type: 'CREATE_ROOM',
-                pseudo: window.localPlayerPseudo
-            }));
-        }
-    }
-
-    joinRoom(roomId) {
-        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            this.socket.send(JSON.stringify({
-                type: 'JOIN_ROOM',
-                roomId: roomId,
-                pseudo: window.localPlayerPseudo
-            }));
-        }
-    }
-
         this.socket.onmessage = (event) => {
             try {
                 const message = JSON.parse(event.data);
@@ -83,6 +62,25 @@ class NetworkSystem {
         this.socket.onerror = (err) => {
             console.error("[NETWORK] WebSocket Error:", err);
         };
+    }
+
+    createRoom() {
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify({
+                type: 'CREATE_ROOM',
+                pseudo: window.localPlayerPseudo
+            }));
+        }
+    }
+
+    joinRoom(roomId) {
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify({
+                type: 'JOIN_ROOM',
+                roomId: roomId,
+                pseudo: window.localPlayerPseudo
+            }));
+        }
     }
 
     overrideActionSystem() {
