@@ -3301,9 +3301,9 @@
                 const pseudoInput = document.getElementById('player-pseudo').value.trim();
                 window.localPlayerPseudo = pseudoInput.length > 0 ? pseudoInput : "Astronaute";
                 
-                if (window.networkSystem && window.networkSystem.connected) {
+                if (state.networkSystem && state.networkSystem.connected) {
                     document.getElementById('create-btn').textContent = "CRÉATION...";
-                    window.networkSystem.createRoom();
+                    state.networkSystem.createRoom();
                 } else {
                     document.getElementById('room-error').textContent = "Serveur non connecté...";
                 }
@@ -3323,9 +3323,9 @@
                 const pseudoInput = document.getElementById('player-pseudo').value.trim();
                 window.localPlayerPseudo = pseudoInput.length > 0 ? pseudoInput : "Astronaute";
                 
-                if (window.networkSystem && window.networkSystem.connected) {
+                if (state.networkSystem && state.networkSystem.connected) {
                     document.getElementById('join-btn').textContent = "CONNEXION...";
-                    window.networkSystem.joinRoom(roomCode);
+                    state.networkSystem.joinRoom(roomCode);
                 } else {
                     document.getElementById('room-error').textContent = "Serveur non connecté...";
                 }
