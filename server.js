@@ -2,6 +2,8 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
+const path = require('path');
 
 // 1. Load the Universal Architecture logic
 const { globalScope } = require('./multiplayerSystem.js');
@@ -13,6 +15,52 @@ const biomeSystem = new BiomeSystem(42); // Fixed seed for multiplayer
 
 // Set of active rooms
 const rooms = new Map(); // roomId -> { id, gameState, createdAt }
+
+// 1.1 Persistance Logic
+const SAVES_DIR = path.join(__dirname, 'saves');
+if (!fs.existsSync(SAVES_DIR)) {
+    fs.mkdirSync(SAVES_DIR, { recursive: true });
+}
+
+function saveRoom(roomId, gameState) {
+    if (!roomId || !gameState) return;
+    try {
+        const filePath = path.join(SAVES_DIR, `${roomId.toUpperCase()}.json`);
+        const tempPath = filePath + '.tmp';
+        
+        const saveData = {
+            roomId: roomId,
+            lastUpdated: Date.now(),
+            gameState: gameState
+        };
+        
+        // Write to tmp and rename mapping (Atomic Write avoids corruption)
+        fs.writeFileSync(tempPath, JSON.stringify(saveData));
+        fs.renameSync(tempPath, filePath);
+    } catch (err) {
+        console.error(`[SAVE] Finalization error for room ${roomId}:`, err);
+    }
+}
+
+function loadRoomSave(roomId) {
+    try {
+        const filePath = path.join(SAVES_DIR, `${roomId.toUpperCase()}.json`);
+        if (!fs.existsSync(filePath)) return null;
+        
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        const parsed = JSON.parse(fileContent);
+        
+        const loadedState = parsed.gameState;
+        // Purge currently active players from the saved state to ensure no "ghost" players
+        loadedState.players = {}; 
+        
+        console.log(`[LOAD] Successfully loaded room ${roomId} from disk.`);
+        return loadedState;
+    } catch (err) {
+        console.error(`[LOAD] Error reading save for room ${roomId}:`, err);
+        return null;
+    }
+}
 
 function generateRoomCode() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -69,6 +117,7 @@ setInterval(() => {
     rooms.forEach((room, roomId) => {
         console.log(`[WORLD] Regenerating resources for room ${roomId}...`);
         const newCount = 100;
+        let resourcesSpawned = false;
         for (let i = 0; i < newCount; i++) {
             const bias = Math.pow(Math.random(), 0.85); 
             const dist = bias * 1400; 
@@ -76,9 +125,19 @@ setInterval(() => {
             const rx = Math.cos(angle) * dist;
             const rz = Math.sin(angle) * dist;
             spawnSingleResource(rx, rz, room.gameState);
+            resourcesSpawned = true;
         }
+        if (resourcesSpawned) saveRoom(roomId, room.gameState); // Ensure this regen is saved
     });
 }, 240000); // 4 minutes
+
+// 1.7 Persistent Background Saver
+setInterval(() => {
+    rooms.forEach((room, roomId) => {
+        saveRoom(roomId, room.gameState);
+    });
+}, 30000); // 30 seconds
+
 
 // 2. Setup Express & HTTP
 const app = express();
@@ -110,6 +169,7 @@ wss.on('connection', (ws) => {
                 seedWorldForRoom(newGameState);
                 
                 rooms.set(roomCode, { id: roomCode, gameState: newGameState, createdAt: Date.now() });
+                saveRoom(roomCode, newGameState); // Immediate initial save
                 
                 // Add player to room
                 clientData.roomId = roomCode;
@@ -125,7 +185,16 @@ wss.on('connection', (ws) => {
 
             if (data.type === 'JOIN_ROOM') {
                 const roomCode = (data.roomId || "").toUpperCase();
-                const room = rooms.get(roomCode);
+                let room = rooms.get(roomCode);
+                
+                // If room entirely missing from memory, attempt retrieval from JSON Local DB
+                if (!room) {
+                    const loadedState = loadRoomSave(roomCode);
+                    if (loadedState) {
+                        room = { id: roomCode, gameState: loadedState, createdAt: Date.now() };
+                        rooms.set(roomCode, room);
+                    }
+                }
                 
                 if (room) {
                     clientData.roomId = roomCode;
@@ -136,6 +205,8 @@ wss.on('connection', (ws) => {
 
                     ws.send(JSON.stringify({ type: 'ROOM_JOINED', roomId: roomCode }));
                     ws.send(JSON.stringify({ type: 'INIT', playerId: clientData.playerId, state: room.gameState }));
+                    
+                    saveRoom(roomCode, room.gameState); // Inform the file that a player connected
                 } else {
                     ws.send(JSON.stringify({ type: 'JOIN_ERROR', message: `Salon ${roomCode} introuvable.` }));
                 }
@@ -159,6 +230,11 @@ wss.on('connection', (ws) => {
                 if (action.playerId !== clientData.playerId) return; // Anti-spoof
                 
                 applyAction(action, room.gameState);
+                
+                // Active Action Save Trigger (Important Events)
+                if (action.type === 'PLACE_MACHINE' || action.type === 'REMOVE_MACHINE' || action.type === 'COLLECT_RESOURCE') {
+                    saveRoom(clientData.roomId, room.gameState);
+                }
                 
                 // --- SPECIAL BROADCAST FOR MEMORY OPTIMIZATION ---
                 if (action.type === 'COLLECT_RESOURCE') {
@@ -197,7 +273,8 @@ wss.on('connection', (ws) => {
                     
                     // Cleanup room if empty
                     if (Object.keys(room.gameState.players).length === 0) {
-                        console.log(`[CLEANUP] Room ${currentRoomId} is empty. Deleting.`);
+                        console.log(`[CLEANUP] Room ${currentRoomId} is empty. Saving and putting it to sleep.`);
+                        saveRoom(currentRoomId, room.gameState); // Deep sleep final backup
                         rooms.delete(currentRoomId);
                     }
                 }
