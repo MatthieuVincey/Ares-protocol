@@ -3301,10 +3301,12 @@
                 const pseudoInput = document.getElementById('player-pseudo').value.trim();
                 window.localPlayerPseudo = pseudoInput.length > 0 ? pseudoInput : "Astronaute";
                 
-                if (state.networkSystem && state.networkSystem.connected) {
+                const net = window.state ? window.state.networkSystem : null;
+                if (net && net.connected) {
                     document.getElementById('create-btn').textContent = "CRÉATION...";
-                    state.networkSystem.createRoom();
+                    net.createRoom();
                 } else {
+                    console.log("Create click failed: ", { netExists: !!net, connected: net ? net.connected : 'N/A' });
                     document.getElementById('room-error').textContent = "Serveur non connecté...";
                 }
             } catch (err) {
@@ -3323,10 +3325,12 @@
                 const pseudoInput = document.getElementById('player-pseudo').value.trim();
                 window.localPlayerPseudo = pseudoInput.length > 0 ? pseudoInput : "Astronaute";
                 
-                if (state.networkSystem && state.networkSystem.connected) {
+                const net = window.state ? window.state.networkSystem : null;
+                if (net && net.connected) {
                     document.getElementById('join-btn').textContent = "CONNEXION...";
-                    state.networkSystem.joinRoom(roomCode);
+                    net.joinRoom(roomCode);
                 } else {
+                    console.log("Join click failed: ", { netExists: !!net, connected: net ? net.connected : 'N/A' });
                     document.getElementById('room-error').textContent = "Serveur non connecté...";
                 }
             } catch (err) {
@@ -3987,6 +3991,10 @@
                 camera.position.copy(state.player.pos);
             }
 
+            // Always update Network & Interaction even before start
+            if (state.networkSystem) state.networkSystem.tick(dt, state);
+            updateInteraction();
+
             if (!state.started) return;
 
 
@@ -4385,8 +4393,8 @@
                     });
                 }
 
-                // --- Network System ---
-                if (state.networkSystem) state.networkSystem.tick(dt, state);
+                // Network System tick moved to top of updateGame
+                // if (state.networkSystem) state.networkSystem.tick(dt, state);
 
                 // --- NEW: Sync Visuals from authoritative GameState ---
                 if (typeof syncGameStateVisuals === 'function') syncGameStateVisuals();
