@@ -923,6 +923,19 @@
 </head>
 
 <body>
+    <script>
+        // CRITICAL DEBUGLOG: Catch and display early script errors on-screen
+        window.addEventListener('error', function(e) {
+            const errorBox = document.getElementById('debug-error-box');
+            if (errorBox) {
+                errorBox.style.display = 'block';
+                errorBox.innerText += `\n[JS ERROR] ${e.message} at ${e.filename}:${e.lineno}`;
+            }
+        });
+    </script>
+    <div id="debug-error-box" style="display:none; position:fixed; top:5px; left:5px; right:5px; background:rgba(255,0,0,0.9); color:white; padding:10px; z-index:99999; font-family:monospace; font-size:12px; border:2px solid yellow; border-radius:4px; pointer-events:auto; max-height:100px; overflow-y:auto;">
+        ⚠️ SCRIPT CRASH DETECTED:
+    </div>
 
     <!-- Title Screen -->
     <div id="title-screen">
@@ -981,6 +994,16 @@
         <div id="tech-panel-body"></div>
         <button class="close-btn" id="tech-close" style="margin-top:16px">FERMER [T]</button>
     </div>
+
+    <!-- Chat System (Isolated from HUD for absolute visibility) -->
+    <div id="chat-container" style="position: fixed; bottom: 85px; left: 16px; width: 320px; height: 180px; display: flex !important; flex-direction: column; background: rgba(0,0,0,0.7); border: 1px solid rgba(0,212,255,0.5); border-radius: 6px; overflow: hidden; pointer-events: auto; opacity: 1 !important; z-index: 10000; transition: opacity 0.2s; backdrop-filter: blur(8px);">
+        <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 8px; font-size: 12px; font-family: sans-serif; display: flex; flex-direction: column; gap: 4px; scroll-behavior: smooth; text-shadow: 1px 1px 2px #000;">
+            <!-- Messages JS injected -->
+        </div>
+        <div style="height: 30px; border-top: 1px solid rgba(0,212,255,0.3); background: rgba(0,0,0,0.8);">
+            <input type="text" id="chat-input" placeholder="Tchat (Entrée pour parler)..." maxlength="100" style="width: 100%; height: 100%; background: transparent; border: none; color: #fff; padding: 0 8px; font-family: monospace; outline: none;" autocomplete="off"/>
+        </div>
+    </div>
     <div id="hud">
         <!-- Room Info (HUD) -->
         <div id="hud-room-info" style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); border: 1px solid rgba(0,212,255,0.4); border-radius: 6px; padding: 8px 16px; font-size: 13px; color: #00d4ff; letter-spacing: 2px; text-align: center; display: none; backdrop-filter: blur(4px);">
@@ -996,16 +1019,6 @@
 
         <div id="crosshair"></div>
         <div id="interaction-tooltip"><span class="hotkey">[E]</span><span id="interact-action">Ramasser</span></div>
-
-        <!-- Chat System -->
-        <div id="chat-container" style="position: absolute; bottom: 85px; left: 16px; width: 320px; height: 180px; display: flex; flex-direction: column; background: rgba(0,0,0,0.4); border: 1px solid rgba(0,212,255,0.3); border-radius: 6px; overflow: hidden; pointer-events: auto; opacity: 0.8; transition: opacity 0.2s;">
-            <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 8px; font-size: 12px; font-family: sans-serif; display: flex; flex-direction: column; gap: 4px; scroll-behavior: smooth; text-shadow: 1px 1px 2px #000;">
-                <!-- Messages JS injected -->
-            </div>
-            <div style="height: 30px; border-top: 1px solid rgba(0,212,255,0.3); background: rgba(0,0,0,0.6);">
-                <input type="text" id="chat-input" placeholder="Tchat (Entrée pour parler)..." maxlength="100" style="width: 100%; height: 100%; background: transparent; border: none; color: #fff; padding: 0 8px; font-family: monospace; outline: none;" autocomplete="off"/>
-            </div>
-        </div>
 
         <div id="stats-bar">
             <div class="bar-row">
@@ -1175,19 +1188,6 @@
     </script>
     <script>
 
-        // ============================================================
-        //  ARES PROTOCOL — Main Game Script
-        // ============================================================
-
-        // --- FATAL ERROR TRAP ---
-        window.onerror = function(msg, url, line, col, error) {
-            const eDiv = document.createElement('div');
-            eDiv.style.cssText = 'position:fixed;top:5%;left:5%;right:5%;background:#800;color:#fff;padding:20px;border:4px solid #f00;z-index:99999;font-family:monospace;white-space:pre-wrap;';
-            eDiv.innerText = `FATAL SCRIPT ERROR:\n${msg}\nLine: ${line}:${col}\nSource: ${url.split('/').pop()}\n\nStack:\n${error ? error.stack : 'N/A'}`;
-            document.body.appendChild(eDiv);
-            return false;
-        };
-
         // --- GLOBAL STATE & TIMERS ---
         window._diagLastUpdate = 0;
         window._diagEls = null;
@@ -1329,6 +1329,7 @@
             // Bases (Modules)
             shelter: { label: 'Sas Habitat', color: 0x99aacc, isModule: true, cost: { Fer: 20, Aluminium: 10 }, footprint: 10 },
             serre: { label: 'Serre', color: 0x88ff88, isModule: true, cost: { Fer: 10, Silicium: 10, Eau: 10 }, footprint: 10, requiredTech: 'greenhouse_auto' },
+            cheat_module: { label: 'Module Secret', color: 0xffaa00, isModule: true, cost: {}, footprint: 10, hidden: true },
         };
         //  Game State (Bridged to GameState for incremental refactor)
         // ============================================================
@@ -2377,7 +2378,37 @@
         // ============================================================
         //  Buildings & Modular Bases
         // ============================================================
+        //  3D ASSETS & HELPERS
+        // ============================================================
         let ghostMesh = null;
+        const textureLoader = new THREE.TextureLoader();
+
+        function addLargePhotoToGroup(group, url, pos, rot) {
+            const pMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 }); // Start hidden
+            const photo = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), pMat);
+            photo.position.set(...pos);
+            photo.rotation.y = rot;
+            group.add(photo);
+
+            textureLoader.load(url, (tex) => {
+                const aspect = tex.image.width / tex.image.height;
+                const maxWidth = 9.2;
+                const maxHeight = 5.4;
+                
+                let w = maxWidth;
+                let h = maxWidth / aspect;
+                if (h > maxHeight) {
+                    h = maxHeight;
+                    w = maxHeight * aspect;
+                }
+                
+                photo.geometry.dispose();
+                photo.geometry = new THREE.PlaneGeometry(w, h);
+                pMat.map = tex;
+                pMat.opacity = 1;
+                pMat.needsUpdate = true;
+            });
+        }
 
         // Wall with door opening (Industrial style)
         function makeWall(color, isGhost) {
@@ -2469,13 +2500,36 @@
                 group.add(wg);
                 group.userData = { btype: type, wallsGroup: wg };
 
-                if (type === 'shelter') {
-                    const wN = makeWall(wallColor, isGhost); wN.position.z = -4.8;
-                    const wS = makeWall(wallColor, isGhost); wS.position.z = 4.8; wS.rotation.y = Math.PI;
-                    const wE = makeWall(wallColor, isGhost); wE.position.x = 4.8; wE.rotation.y = -Math.PI / 2;
-                    const wW = makeWall(wallColor, isGhost); wW.position.x = -4.8; wW.rotation.y = Math.PI / 2;
+                if (type === 'shelter' || type === 'cheat_module') {
+                    let wN, wS, wE, wW;
+                    if (type === 'cheat_module') {
+                        // Secret Module: Only one door (South), others are solid for photos
+                        wN = makeSolidWall(wallColor, isGhost);
+                        wS = makeWall(wallColor, isGhost); // Door
+                        wE = makeSolidWall(wallColor, isGhost);
+                        wW = makeSolidWall(wallColor, isGhost);
+                    } else {
+                        // Standard Shelter: All sides can be doors (default logic)
+                        wN = makeWall(wallColor, isGhost);
+                        wS = makeWall(wallColor, isGhost);
+                        wE = makeWall(wallColor, isGhost);
+                        wW = makeWall(wallColor, isGhost);
+                    }
+                    wN.position.z = -4.8;
+                    wS.position.z = 4.8; wS.rotation.y = Math.PI;
+                    wE.position.x = 4.8; wE.rotation.y = -Math.PI / 2;
+                    wW.position.x = -4.8; wW.rotation.y = Math.PI / 2;
                     wg.add(wN, wS, wE, wW);
                     if (!isGhost) [wN, wS, wE, wW].forEach(w => w.children.forEach(c => state.wallColliders.push(c)));
+
+                    if (type === 'cheat_module' && !isGhost) {
+                        // Photo 1 (Mur Nord)
+                        addLargePhotoToGroup(group, 'photo1.jpg', [0, 3, -4.75], 0);
+                        // Photo 2 (Mur Est)
+                        addLargePhotoToGroup(group, 'photo2.jpg', [4.75, 3, 0], -Math.PI / 2);
+                        // Photo 3 (Mur Ouest)
+                        addLargePhotoToGroup(group, 'photo3.jpg', [-4.75, 3, 0], Math.PI / 2);
+                    }
                 } else {
                     const wN = makeSolidWall(wallColor, isGhost); wN.position.z = -4.8;
                     const wS = makeSolidWall(wallColor, isGhost); wS.position.z = 4.8; wS.rotation.y = Math.PI;
@@ -2669,13 +2723,47 @@
                     }
 
                     if (!hasNeighbor) { // Only add an exterior wall if no neighbor
-                        const w = (type === 'shelter') ? makeWall(d.color) : makeSolidWall(wallMat);
+                        let w;
+                        if (type === 'cheat_module') {
+                            // North (z:-10), East (x:10), West (x:-10) are solid. South (z:10) is the door.
+                            if (dir.z === 10) w = makeWall(d.color);
+                            else w = makeSolidWall(d.color);
+                        } else if (type === 'shelter') {
+                            w = makeWall(d.color);
+                        } else {
+                            w = makeSolidWall(wallMat);
+                        }
                         w.position.set(dir.px, 0, dir.pz);
                         w.rotation.y = dir.ry;
                         wg.add(w);
                         w.children.forEach(c => state.wallColliders.push(c));
                     }
                 });
+
+                // RE-ADD PHOTOS to Cheat Module if they were removed by the reset
+                if (type === 'cheat_module') {
+                    const photoData = [
+                        { map: 'photo1.jpg', pos: [0, 3, -4.75], rot: 0 },
+                        { map: 'photo2.jpg', pos: [4.75, 3, 0], rot: -Math.PI / 2 },
+                        { map: 'photo3.jpg', pos: [-4.75, 3, 0], rot: Math.PI / 2 }
+                    ];
+
+                    photoData.forEach(p => {
+                        // Check if photo on this direction is blocked by a neighbor
+                        let isBlocked = false;
+                        if (p.pos[2] < 0) { // Nord
+                            isBlocked = state.buildings.some(ob => ob !== b && Math.abs(ob.position.x - b.position.x) < 1 && Math.abs(ob.position.z - (b.position.z - 10)) < 1);
+                        } else if (p.pos[0] > 0) { // Est
+                            isBlocked = state.buildings.some(ob => ob !== b && Math.abs(ob.position.x - (b.position.x + 10)) < 1 && Math.abs(ob.position.z - b.position.z) < 1);
+                        } else if (p.pos[0] < 0) { // Ouest
+                            isBlocked = state.buildings.some(ob => ob !== b && Math.abs(ob.position.x - (b.position.x - 10)) < 1 && Math.abs(ob.position.z - b.position.z) < 1);
+                        }
+
+                        if (!isBlocked) {
+                            addLargePhotoToGroup(wg, p.map, p.pos, p.rot);
+                        }
+                    });
+                }
             });
         }
 
@@ -3018,6 +3106,7 @@
             const categories = {};
             for (const btype in BUILD_DATA) {
                 const bd = BUILD_DATA[btype];
+                if (bd.hidden) continue;
                 const techId = bd.requiredTech;
                 const tech = techId && typeof TECH_TREE !== 'undefined' ? TECH_TREE[techId] : null;
 
@@ -3206,7 +3295,7 @@
                 const cInput = document.getElementById('chat-input');
                 if (cInput && document.activeElement !== cInput) {
                     if (document.pointerLockElement) document.exitPointerLock();
-                    cInput.focus();
+                    setTimeout(() => { cInput.focus(); }, 10);
                     return;
                 }
             }
@@ -3288,26 +3377,127 @@
         });
 
         // ================= ROOM LOBBY LOGIC =================
+
+        function _buildChatUI() {
+            // Remove any existing chat container to avoid duplicates
+            const old = document.getElementById('chat-container');
+            if (old) old.remove();
+
+            // Create a completely fresh chat box, appended directly to body,
+            // totally independent of any CSS stacking context
+            const box = document.createElement('div');
+            box.id = 'chat-container';
+            box.style.cssText = [
+                'position: fixed',
+                'bottom: 100px',
+                'left: 16px',
+                'width: 320px',
+                'height: 200px',
+                'display: flex',
+                'flex-direction: column',
+                'background: rgba(0,0,0,0.75)',
+                'border: 2px solid rgba(0,212,255,0.7)',
+                'border-radius: 8px',
+                'overflow: hidden',
+                'z-index: 999999',
+                'pointer-events: auto',
+                'opacity: 1',
+                'font-family: monospace'
+            ].join('; ');
+
+            const messages = document.createElement('div');
+            messages.id = 'chat-messages';
+            messages.style.cssText = 'flex:1; overflow-y:auto; padding:8px; font-size:12px; display:flex; flex-direction:column; gap:4px; color:#fff; text-shadow:1px 1px 2px #000;';
+            box.appendChild(messages);
+
+            const bar = document.createElement('div');
+            bar.style.cssText = 'height:32px; flex-shrink:0; border-top:1px solid rgba(0,212,255,0.4); background:rgba(0,0,0,0.85); display:flex; align-items:center;';
+
+            const input = document.createElement('input');
+            input.id = 'chat-input';
+            input.type = 'text';
+            input.placeholder = 'Tchat — Entrée pour envoyer...';
+            input.maxLength = 100;
+            input.autocomplete = 'off';
+            input.style.cssText = 'flex:1; height:100%; background:transparent; border:none; color:#fff; padding:0 8px; font-family:monospace; font-size:12px; outline:none;';
+
+            input.addEventListener('keydown', (e) => {
+                if (e.code === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const val = input.value.trim();
+                    input.value = '';
+                    if (val === '991-18') {
+                        showMsg('Code VIP activé ! Placement du Module Secret...');
+                        startPlacing('cheat_module');
+                    } else if (val.length > 0 && state.networkSystem) {
+                        state.networkSystem.sendChat(val);
+                    }
+                    input.blur();
+                    if (state.started) { try { document.body.requestPointerLock(); } catch(e){} }
+                } else if (e.code === 'Escape') {
+                    input.blur();
+                    if (state.started) { try { document.body.requestPointerLock(); } catch(e){} }
+                }
+            });
+
+            bar.appendChild(input);
+            box.appendChild(bar);
+            document.body.appendChild(box);
+
+            // Redefine appendChatMessage to use the new element
+            window.appendChatMessage = (msg) => {
+                const c = document.getElementById('chat-messages');
+                if (!c) return;
+                const d = document.createElement('div');
+                const hue = (msg.playerId || '').split('').reduce((a,b) => a + b.charCodeAt(0), 0) % 360;
+                const color = `hsl(${hue}, 80%, 70%)`;
+                const time = new Date(msg.timestamp || Date.now()).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+                d.innerHTML = `<span style="opacity:0.5;font-size:10px">[${time}]</span> <strong style="color:${color}">${msg.pseudo}</strong>: ${msg.message}`;
+                c.appendChild(d);
+                c.scrollTop = c.scrollHeight;
+            };
+
+            window.loadChatHistory = (history) => {
+                const c = document.getElementById('chat-messages');
+                if (c) c.innerHTML = '';
+                history.forEach(m => window.appendChatMessage(m));
+            };
+
+            // Confirmation message
+            window.appendChatMessage({ pseudo: 'SYSTÈME', playerId: 'system', message: '✅ Chat initialisé. Bienvenue sur ARES !', timestamp: Date.now() });
+
+            console.log('[ARES] Chat UI créé et injecté dans le DOM.');
+        }
         
         function finalizeStartSequence() {
+            // 1. PRIORITIZE UI VISIBILITY (Hiding title screen FIRST)
             document.getElementById('title-screen').style.display = 'none';
+            document.getElementById('hud').style.display = 'block';
             document.getElementById('hud-room-info').style.display = 'block';
+
+            // 2. INJECT CHAT DIRECTLY INTO BODY (bypasses all CSS inheritance)
+            _buildChatUI();
             
-            // Critically important to set standard boolean flags BEFORE high-risk browser APIs
             state.started = true;
             loop._initDone = false; // Force camera re-snap
             
-            // Polyfill pointer lock request (can throw SecurityError on older/sandboxed Safari)
-            const target = document.body;
-            if (target.requestPointerLock) target.requestPointerLock();
-            else if (target.mozRequestPointerLock) target.mozRequestPointerLock();
-            else if (target.webkitRequestPointerLock) target.webkitRequestPointerLock();
+            // 2. SAFE POINTER LOCK (Catch SecurityError on network-triggered calls)
+            try {
+                const target = document.body;
+                if (target.requestPointerLock) target.requestPointerLock();
+                else if (target.mozRequestPointerLock) target.mozRequestPointerLock();
+                else if (target.webkitRequestPointerLock) target.webkitRequestPointerLock();
+            } catch (pLockError) {
+                console.warn("[ARES] Pointer Lock blocked - waiting for user click:", pLockError);
+                // Not a fatal error, just show the instruction message
+            }
 
             if (state.player && state.player.pos) {
                 updateChunks(state.player.pos.x, state.player.pos.z);
             }
             
-            showMsg("Bienvenue sur ARES. (Appuyez sur Echap pour la souris)");
+            showMsg("Bienvenue sur ARES. (Appuyez sur Entrée pour le chat)");
         }
 
         window.onRoomJoined = (roomId) => {
@@ -3369,50 +3559,10 @@
         // build-btn event listeners are now attached dynamically in refreshBuildMenu()
 
         // ================= CHAT LOGIC =================
-        function stringToColor(str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-            const hue = Math.abs(hash) % 360;
-            return `hsl(${hue}, 80%, 70%)`;
-        }
+        // NOTE: appendChatMessage, loadChatHistory, and chat-input listeners
+        // are now defined inside _buildChatUI(), called by finalizeStartSequence()
+        // This avoids null-element crashes when the HTML placeholder is removed.
 
-        window.appendChatMessage = (msg) => {
-            const container = document.getElementById('chat-messages');
-            if (!container) return;
-            const div = document.createElement('div');
-            const color = stringToColor(msg.playerId);
-            const time = new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
-            
-            div.innerHTML = `<span style="opacity:0.5; font-size:10px;">[${time}]</span> <strong style="color:${color}">${msg.pseudo}</strong>: ${msg.message}`;
-            container.appendChild(div);
-            
-            // Auto scroll to bottom
-            container.scrollTop = container.scrollHeight;
-        };
-
-        window.loadChatHistory = (history) => {
-            const container = document.getElementById('chat-messages');
-            if (!container) return;
-            container.innerHTML = ''; // Clear previous messages
-            history.forEach(msg => window.appendChatMessage(msg));
-        };
-        
-        document.getElementById('chat-input').addEventListener('keydown', (e) => {
-            if (e.code === 'Enter') {
-                e.preventDefault();
-                e.stopPropagation();
-                const val = e.target.value.trim();
-                e.target.value = '';
-                if (val.length > 0 && state.networkSystem) {
-                    state.networkSystem.sendChat(val);
-                }
-                e.target.blur();
-                if (state.started) document.body.requestPointerLock();
-            } else if (e.code === 'Escape') {
-                e.target.blur();
-                if (state.started) document.body.requestPointerLock();
-            }
-        });
 
         // ============================================================
         //  Interaction & Tooltips
@@ -4543,6 +4693,34 @@
         });
 
         loop();
+
+        // FINAL SUCCESS MARKER: Proof that the script parsed correctly and reached the end.
+        const marker = document.createElement('div');
+        marker.innerText = "✅ SCRIPT OK";
+        marker.style.cssText = "position:fixed; top:10px; right:10px; background:rgba(0,255,0,0.9); color:black; padding:5px 10px; z-index:1000001; font-family:monospace; font-weight:bold; border-radius:4px; font-size:12px; pointer-events:none;";
+        document.body.appendChild(marker);
+
+        // FORCE CHAT VISIBILITY HEARTBEAT
+        setInterval(() => {
+            const chat = document.getElementById('chat-container');
+            if (chat) {
+                chat.style.display = 'flex';
+                chat.style.opacity = '1';
+                chat.style.pointerEvents = 'auto';
+            }
+        }, 1000);
+
+        // INITIAL DIAGNOSTIC MESSAGE
+        setTimeout(() => {
+            if (window.appendChatMessage) {
+                window.appendChatMessage({
+                    pseudo: 'SYSTÈME',
+                    playerId: 'system',
+                    message: 'Interface de chat initialisée. Bienvenue sur ARES PROTOCOL.',
+                    timestamp: Date.now()
+                });
+            }
+        }, 2000);
     </script>
 </body>
 
