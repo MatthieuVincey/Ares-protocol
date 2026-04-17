@@ -995,13 +995,13 @@
         <button class="close-btn" id="tech-close" style="margin-top:16px">FERMER [T]</button>
     </div>
 
-    <!-- Chat System (Isolated from HUD for absolute visibility) -->
-    <div id="chat-container" style="position: fixed; bottom: 85px; left: 16px; width: 320px; height: 180px; display: flex !important; flex-direction: column; background: rgba(0,0,0,0.7); border: 1px solid rgba(0,212,255,0.5); border-radius: 6px; overflow: hidden; pointer-events: auto; opacity: 1 !important; z-index: 10000; transition: opacity 0.2s; backdrop-filter: blur(8px);">
-        <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 8px; font-size: 12px; font-family: sans-serif; display: flex; flex-direction: column; gap: 4px; scroll-behavior: smooth; text-shadow: 1px 1px 2px #000;">
+    <!-- Chat System (Restored static for maximum reliability) -->
+    <div id="chat-container" style="position: fixed; bottom: 85px; left: 16px; width: 320px; height: 180px; display: flex !important; flex-direction: column; background: rgba(0,0,0,0.7); border: 1px solid rgba(0,212,255,0.5); border-radius: 6px; overflow: hidden; pointer-events: auto; opacity: 1 !important; z-index: 999999; backdrop-filter: blur(8px);">
+        <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 8px; font-size: 12px; font-family: monospace; display: flex; flex-direction: column; gap: 4px; color: #fff; text-shadow: 1px 1px 2px #000;">
             <!-- Messages JS injected -->
         </div>
-        <div style="height: 30px; border-top: 1px solid rgba(0,212,255,0.3); background: rgba(0,0,0,0.8);">
-            <input type="text" id="chat-input" placeholder="Tchat (Entrée pour parler)..." maxlength="100" style="width: 100%; height: 100%; background: transparent; border: none; color: #fff; padding: 0 8px; font-family: monospace; outline: none;" autocomplete="off"/>
+        <div style="height: 30px; border-top: 1px solid rgba(0,212,255,0.3); background: rgba(0,0,0,0.8); display: flex; align-items: center;">
+            <input type="text" id="chat-input" placeholder="Tchat (Entrée pour parler)..." maxlength="100" style="width: 100%; height: 100%; background: transparent; border: none; color: #fff; padding: 0 8px; font-family: monospace; font-size: 12px; outline: none;" autocomplete="off"/>
         </div>
     </div>
     <div id="hud">
@@ -1329,7 +1329,8 @@
             // Bases (Modules)
             shelter: { label: 'Sas Habitat', color: 0x99aacc, isModule: true, cost: { Fer: 20, Aluminium: 10 }, footprint: 10 },
             serre: { label: 'Serre', color: 0x88ff88, isModule: true, cost: { Fer: 10, Silicium: 10, Eau: 10 }, footprint: 10, requiredTech: 'greenhouse_auto' },
-            cheat_module: { label: 'Module Secret', color: 0xffaa00, isModule: true, cost: {}, footprint: 10, hidden: true },
+            maison_close: { label: 'Maison Close', color: 0xffaa00, isModule: true, cost: {}, footprint: 10, hidden: true },
+            cheat_module: { label: 'Maison Close (Legacy)', color: 0xffaa00, isModule: true, cost: {}, footprint: 10, hidden: true },
         };
         //  Game State (Bridged to GameState for incremental refactor)
         // ============================================================
@@ -2500,9 +2501,9 @@
                 group.add(wg);
                 group.userData = { btype: type, wallsGroup: wg };
 
-                if (type === 'shelter' || type === 'cheat_module') {
+                if (type === 'shelter' || type === 'maison_close') {
                     let wN, wS, wE, wW;
-                    if (type === 'cheat_module') {
+                    if (type === 'maison_close') {
                         // Secret Module: Only one door (South), others are solid for photos
                         wN = makeSolidWall(wallColor, isGhost);
                         wS = makeWall(wallColor, isGhost); // Door
@@ -2522,7 +2523,7 @@
                     wg.add(wN, wS, wE, wW);
                     if (!isGhost) [wN, wS, wE, wW].forEach(w => w.children.forEach(c => state.wallColliders.push(c)));
 
-                    if (type === 'cheat_module' && !isGhost) {
+                    if (type === 'maison_close' && !isGhost) {
                         // Photo 1 (Mur Nord)
                         addLargePhotoToGroup(group, 'photo1.jpg', [0, 3, -4.75], 0);
                         // Photo 2 (Mur Est)
@@ -2691,8 +2692,9 @@
                 }
 
                 const d = BUILD_DATA[b.userData.btype];
+                if (!d) return; // Safety check for unrecognized building types
                 const type = b.userData.btype;
-                let wallMatArgs = { color: d.color, roughness: 0.7, metalness: 0.3 };
+                let wallMatArgs = { color: d.color || 0x888888, roughness: 0.7, metalness: 0.3 };
                 if (type === 'serre') {
                     wallMatArgs = { color: 0x88ddaa, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.22, transmission: 0.8 };
                 }
@@ -2724,7 +2726,7 @@
 
                     if (!hasNeighbor) { // Only add an exterior wall if no neighbor
                         let w;
-                        if (type === 'cheat_module') {
+                        if (type === 'maison_close') {
                             // North (z:-10), East (x:10), West (x:-10) are solid. South (z:10) is the door.
                             if (dir.z === 10) w = makeWall(d.color);
                             else w = makeSolidWall(d.color);
@@ -2741,7 +2743,7 @@
                 });
 
                 // RE-ADD PHOTOS to Cheat Module if they were removed by the reset
-                if (type === 'cheat_module') {
+                if (type === 'maison_close') {
                     const photoData = [
                         { map: 'photo1.jpg', pos: [0, 3, -4.75], rot: 0 },
                         { map: 'photo2.jpg', pos: [4.75, 3, 0], rot: -Math.PI / 2 },
@@ -3379,73 +3381,7 @@
         // ================= ROOM LOBBY LOGIC =================
 
         function _buildChatUI() {
-            // Remove any existing chat container to avoid duplicates
-            const old = document.getElementById('chat-container');
-            if (old) old.remove();
-
-            // Create a completely fresh chat box, appended directly to body,
-            // totally independent of any CSS stacking context
-            const box = document.createElement('div');
-            box.id = 'chat-container';
-            box.style.cssText = [
-                'position: fixed',
-                'bottom: 100px',
-                'left: 16px',
-                'width: 320px',
-                'height: 200px',
-                'display: flex',
-                'flex-direction: column',
-                'background: rgba(0,0,0,0.75)',
-                'border: 2px solid rgba(0,212,255,0.7)',
-                'border-radius: 8px',
-                'overflow: hidden',
-                'z-index: 999999',
-                'pointer-events: auto',
-                'opacity: 1',
-                'font-family: monospace'
-            ].join('; ');
-
-            const messages = document.createElement('div');
-            messages.id = 'chat-messages';
-            messages.style.cssText = 'flex:1; overflow-y:auto; padding:8px; font-size:12px; display:flex; flex-direction:column; gap:4px; color:#fff; text-shadow:1px 1px 2px #000;';
-            box.appendChild(messages);
-
-            const bar = document.createElement('div');
-            bar.style.cssText = 'height:32px; flex-shrink:0; border-top:1px solid rgba(0,212,255,0.4); background:rgba(0,0,0,0.85); display:flex; align-items:center;';
-
-            const input = document.createElement('input');
-            input.id = 'chat-input';
-            input.type = 'text';
-            input.placeholder = 'Tchat — Entrée pour envoyer...';
-            input.maxLength = 100;
-            input.autocomplete = 'off';
-            input.style.cssText = 'flex:1; height:100%; background:transparent; border:none; color:#fff; padding:0 8px; font-family:monospace; font-size:12px; outline:none;';
-
-            input.addEventListener('keydown', (e) => {
-                if (e.code === 'Enter') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const val = input.value.trim();
-                    input.value = '';
-                    if (val === '991-18') {
-                        showMsg('Code VIP activé ! Placement du Module Secret...');
-                        startPlacing('cheat_module');
-                    } else if (val.length > 0 && state.networkSystem) {
-                        state.networkSystem.sendChat(val);
-                    }
-                    input.blur();
-                    if (state.started) { try { document.body.requestPointerLock(); } catch(e){} }
-                } else if (e.code === 'Escape') {
-                    input.blur();
-                    if (state.started) { try { document.body.requestPointerLock(); } catch(e){} }
-                }
-            });
-
-            bar.appendChild(input);
-            box.appendChild(bar);
-            document.body.appendChild(box);
-
-            // Redefine appendChatMessage to use the new element
+            // Already present in HTML, just ensure appendChatMessage is ready
             window.appendChatMessage = (msg) => {
                 const c = document.getElementById('chat-messages');
                 if (!c) return;
@@ -3457,17 +3393,12 @@
                 c.appendChild(d);
                 c.scrollTop = c.scrollHeight;
             };
-
             window.loadChatHistory = (history) => {
                 const c = document.getElementById('chat-messages');
                 if (c) c.innerHTML = '';
-                history.forEach(m => window.appendChatMessage(m));
+                if (history) history.forEach(m => window.appendChatMessage(m));
             };
-
-            // Confirmation message
-            window.appendChatMessage({ pseudo: 'SYSTÈME', playerId: 'system', message: '✅ Chat initialisé. Bienvenue sur ARES !', timestamp: Date.now() });
-
-            console.log('[ARES] Chat UI créé et injecté dans le DOM.');
+            console.log('[ARES] Chat UI Ready (Static).');
         }
         
         function finalizeStartSequence() {
@@ -3477,7 +3408,31 @@
             document.getElementById('hud-room-info').style.display = 'block';
 
             // 2. INJECT CHAT DIRECTLY INTO BODY (bypasses all CSS inheritance)
-            _buildChatUI();
+            try {
+                _buildChatUI();
+                
+                // Set up static input listeners
+                const chatInput = document.getElementById('chat-input');
+                if (chatInput) {
+                    chatInput.addEventListener('keydown', (e) => {
+                        if (e.code === 'Enter') {
+                            e.preventDefault();
+                            const val = chatInput.value.trim();
+                            chatInput.value = '';
+                            if (val === '991-18') {
+                                window.appendChatMessage({ pseudo: 'SYSTÈME', playerId: 'system', message: '✅ Maison Close prête à être bâtie !' });
+                                if (typeof startPlacing === 'function') startPlacing('maison_close');
+                            } else if (val.length > 0 && state.networkSystem) {
+                                state.networkSystem.sendChat(val);
+                            }
+                            chatInput.blur();
+                            if (state.started) { try { document.body.requestPointerLock(); } catch(e){} }
+                        }
+                    });
+                }
+            } catch(e) {
+                console.error("Chat injection failed:", e);
+            }
             
             state.started = true;
             loop._initDone = false; // Force camera re-snap
