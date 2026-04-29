@@ -343,6 +343,38 @@ setInterval(() => {
 
 }, 1000 / TICK_RATE);
 
+// 5. AUTO-CLEANUP SYSTEM (Delete rooms inactive for > 2 days)
+function performCleanup() {
+    console.log("[CLEANUP] Scanning for expired room saves...");
+    const now = Date.now();
+    const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+    
+    try {
+        if (!fs.existsSync(SAVES_DIR)) return;
+        const files = fs.readdirSync(SAVES_DIR);
+        let deletedCount = 0;
+
+        files.forEach(file => {
+            if (!file.endsWith('.json')) return;
+            const filePath = path.join(SAVES_DIR, file);
+            const stats = fs.statSync(filePath);
+            
+            if (now - stats.mtimeMs > TWO_DAYS_MS) {
+                console.log(`[CLEANUP] Deleting expired room: ${file} (Inactive for ${Math.round((now - stats.mtimeMs)/(24*3600000))} days)`);
+                fs.unlinkSync(filePath);
+                deletedCount++;
+            }
+        });
+        if (deletedCount > 0) console.log(`[CLEANUP] Successfully purged ${deletedCount} expired room(s).`);
+    } catch (err) {
+        console.error("[CLEANUP] Error during directory scan:", err);
+    }
+}
+
+// Initialize cleanup logic
+performCleanup();
+setInterval(performCleanup, 6 * 60 * 60 * 1000); // Check every 6 hours
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`===============================================`);
