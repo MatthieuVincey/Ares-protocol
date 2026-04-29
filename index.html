@@ -3380,25 +3380,50 @@
 
         // ================= ROOM LOBBY LOGIC =================
 
+        // === CHAT INIT (immédiat, indépendant de la connexion réseau) ===
+        window.appendChatMessage = (msg) => {
+            const c = document.getElementById('chat-messages');
+            if (!c) return;
+            const d = document.createElement('div');
+            const hue = (msg.playerId || '').split('').reduce((a,b) => a + b.charCodeAt(0), 0) % 360;
+            const color = `hsl(${hue}, 80%, 70%)`;
+            const time = new Date(msg.timestamp || Date.now()).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+            d.innerHTML = `<span style="opacity:0.5;font-size:10px">[${time}]</span> <strong style="color:${color}">${msg.pseudo}</strong>: ${msg.message}`;
+            c.appendChild(d);
+            c.scrollTop = c.scrollHeight;
+        };
+        window.loadChatHistory = (history) => {
+            const c = document.getElementById('chat-messages');
+            if (c) c.innerHTML = '';
+            if (history) history.forEach(m => window.appendChatMessage(m));
+        };
+
+        // Listener de l'input chat — branché directement sur le DOM statique
+        (function initChatInput() {
+            const chatInput = document.getElementById('chat-input');
+            if (!chatInput) { console.error('[CHAT] chat-input introuvable !'); return; }
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.code !== 'Enter') return;
+                e.preventDefault();
+                e.stopPropagation();
+                const val = chatInput.value.trim();
+                chatInput.value = '';
+                if (!val) return;
+                if (val === '991-18') {
+                    window.appendChatMessage({ pseudo: 'SYSTÈME', playerId: 'system', message: '✅ Maison Close prête à être bâtie !' });
+                    if (typeof startPlacing === 'function') startPlacing('maison_close');
+                } else if (state && state.networkSystem) {
+                    state.networkSystem.sendChat(val);
+                }
+                chatInput.blur();
+                if (state && state.started) { try { document.body.requestPointerLock(); } catch(e){} }
+            });
+            console.log('[ARES] Chat input listener prêt.');
+        })();
+
         function _buildChatUI() {
-            // Already present in HTML, just ensure appendChatMessage is ready
-            window.appendChatMessage = (msg) => {
-                const c = document.getElementById('chat-messages');
-                if (!c) return;
-                const d = document.createElement('div');
-                const hue = (msg.playerId || '').split('').reduce((a,b) => a + b.charCodeAt(0), 0) % 360;
-                const color = `hsl(${hue}, 80%, 70%)`;
-                const time = new Date(msg.timestamp || Date.now()).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-                d.innerHTML = `<span style="opacity:0.5;font-size:10px">[${time}]</span> <strong style="color:${color}">${msg.pseudo}</strong>: ${msg.message}`;
-                c.appendChild(d);
-                c.scrollTop = c.scrollHeight;
-            };
-            window.loadChatHistory = (history) => {
-                const c = document.getElementById('chat-messages');
-                if (c) c.innerHTML = '';
-                if (history) history.forEach(m => window.appendChatMessage(m));
-            };
-            console.log('[ARES] Chat UI Ready (Static).');
+            // La fonction est conservée pour compatibilité mais tout est déjà initialisé ci-dessus
+            console.log('[ARES] _buildChatUI() appelée (listeners déjà actifs).');
         }
         
         function finalizeStartSequence() {
@@ -3407,32 +3432,14 @@
             document.getElementById('hud').style.display = 'block';
             document.getElementById('hud-room-info').style.display = 'block';
 
-            // 2. INJECT CHAT DIRECTLY INTO BODY (bypasses all CSS inheritance)
-            try {
-                _buildChatUI();
-                
-                // Set up static input listeners
-                const chatInput = document.getElementById('chat-input');
-                if (chatInput) {
-                    chatInput.addEventListener('keydown', (e) => {
-                        if (e.code === 'Enter') {
-                            e.preventDefault();
-                            const val = chatInput.value.trim();
-                            chatInput.value = '';
-                            if (val === '991-18') {
-                                window.appendChatMessage({ pseudo: 'SYSTÈME', playerId: 'system', message: '✅ Maison Close prête à être bâtie !' });
-                                if (typeof startPlacing === 'function') startPlacing('maison_close');
-                            } else if (val.length > 0 && state.networkSystem) {
-                                state.networkSystem.sendChat(val);
-                            }
-                            chatInput.blur();
-                            if (state.started) { try { document.body.requestPointerLock(); } catch(e){} }
-                        }
-                    });
-                }
-            } catch(e) {
-                console.error("Chat injection failed:", e);
+            // 2. RENDRE LE CHAT VISIBLE (il est déjà dans le DOM, on s'assure juste qu'il est visible)
+            const chatContainer = document.getElementById('chat-container');
+            if (chatContainer) {
+                chatContainer.style.display = 'flex';
+                chatContainer.style.opacity = '1';
             }
+            _buildChatUI(); // Log de confirmation uniquement
+
             
             state.started = true;
             loop._initDone = false; // Force camera re-snap
