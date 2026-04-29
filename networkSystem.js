@@ -169,6 +169,44 @@ class NetworkSystem {
                 }
             }
         }
+        else if (message.type === 'PLAYER_MOVED') {
+            const action = message.action;
+            const lp = window.GameState.players[action.playerId];
+            if (lp) {
+                if (!lp.targetPos) lp.targetPos = new THREE.Vector3();
+                lp.targetPos.copy(action.position);
+                if (action.rotation !== undefined) lp.rotation.y = action.rotation.y;
+                if (action.velocity !== undefined) lp.velocity.copy(action.velocity);
+                if (action.state !== undefined) lp.state = action.state;
+                if (lp.jetpack && action.jetpackFuel !== undefined) lp.jetpack.fuel = action.jetpackFuel;
+                
+                // Track timestamp to prevent older STATE_UPDATE packets from causing rollback
+                lp.lastMoveTimestamp = action.timestamp || Date.now();
+
+                // Étape 8 - DEBUG LATENCE (Console)
+                if (action.timestamp) {
+                    if (!lp.debugMoveCount) lp.debugMoveCount = 0;
+                    lp.debugMoveCount++;
+                    if (lp.debugMoveCount % 40 === 0) { // Log 1 fois toutes les 2 secondes environ
+                        const latence = Date.now() - action.timestamp;
+                        console.log(`[DEBUG LATENCE] Mouvement reçu de ${action.playerId} - Temps écoulé: ${latence}ms`);
+                    }
+                }
+
+                // Étape 5 - BUFFER DE POSITIONS
+                if (!lp.positionsBuffer) lp.positionsBuffer = [];
+                lp.positionsBuffer.push({
+                    position: new THREE.Vector3().copy(action.position),
+                    timestamp: lp.lastMoveTimestamp
+                });
+                if (lp.positionsBuffer.length > 5) lp.positionsBuffer.shift();
+
+                // If the remote player teleported or just spawned far away, snap them
+                if (lp.pos.distanceTo(lp.targetPos) > 50) {
+                    lp.pos.copy(lp.targetPos);
+                }
+            }
+        }
         else if (message.type === 'STATE_UPDATE') {
             this.syncFromServer(message.state);
         }
@@ -258,10 +296,15 @@ class NetworkSystem {
                 }
             } else {
                 // REMOTE PLAYER: Set up LERP target for smooth interpolation
-                if (!lp.targetPos) lp.targetPos = new THREE.Vector3();
-                lp.targetPos.copy(sp.pos);
-                lp.rotation.y = sp.rotation.y;
-                lp.velocity.copy(sp.velocity);
+                // Only use STATE_UPDATE position if we haven't received a more recent direct PLAYER_MOVED event
+                const updateIsStale = lp.lastMoveTimestamp && (Date.now() - lp.lastMoveTimestamp < 200);
+                
+                if (!updateIsStale) {
+                    if (!lp.targetPos) lp.targetPos = new THREE.Vector3();
+                    lp.targetPos.copy(sp.pos);
+                    lp.rotation.y = sp.rotation.y;
+                    lp.velocity.copy(sp.velocity);
+                }
                 
                 // If the remote player teleported or just spawned far away, snap them
                 if (lp.pos.distanceTo(lp.targetPos) > 50) {
@@ -316,9 +359,20 @@ class NetworkSystem {
             if (id === window.localPlayerId) continue;
             
             const p = state.players[id];
+            
+            // Étape 6 - PRÉDICTION LÉGÈRE
+            if (p.velocity && p.targetPos && p.lastMoveTimestamp) {
+                const timeSinceLastUpdate = Date.now() - p.lastMoveTimestamp;
+                // Si aucune donnée reçue depuis plus longtemps que notre tickrate (ex: 100ms), on prédit
+                if (timeSinceLastUpdate > 60) {
+                    // Continuer dans la dernière direction (velocity estimée)
+                    p.targetPos.addScaledVector(p.velocity, dt);
+                }
+            }
+
             if (p.targetPos) {
-                // LERP towards target position for smooth motion (10.0 speed factor relative to dt)
-                p.pos.lerp(p.targetPos, Math.min(1.0, 10.0 * dt));
+                // Étape 4 - LERP: mouvement fluide
+                p.pos.lerp(p.targetPos, 0.15);
             }
         }
         

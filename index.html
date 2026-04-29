@@ -4434,15 +4434,20 @@
                     if (!ph.isGrounded) playerStateString = 'jetpack';
                     else if (ph.velX !== 0 || ph.velZ !== 0) playerStateString = (state.keys['ShiftLeft'] || state.keys['ShiftRight']) ? 'running' : 'walking';
 
-                    window.sendAction({
-                        type: 'PLAYER_MOVE',
-                        playerId: window.localPlayerId,
-                        position: { x: targetPosX, y: targetPosY, z: targetPosZ },
-                        rotation: { y: state.yaw },
-                        velocity: { x: ph.velX, y: ph.velY, z: ph.velZ },
-                        state: playerStateString,
-                        jetpackFuel: state.player.jetpack.fuel
-                    });
+                    if (!window.lastNetMoveTime) window.lastNetMoveTime = 0;
+                    if (now - window.lastNetMoveTime > 50) { // 20 updates per second
+                        window.lastNetMoveTime = now;
+                        window.sendAction({
+                            type: 'PLAYER_MOVE',
+                            playerId: window.localPlayerId,
+                            position: { x: targetPosX, y: targetPosY, z: targetPosZ },
+                            rotation: { y: state.yaw },
+                            velocity: { x: ph.velX, y: ph.velY, z: ph.velZ },
+                            state: playerStateString,
+                            jetpackFuel: state.player.jetpack.fuel,
+                            timestamp: Date.now()
+                        });
+                    }
 
                     // 8. Landing impact decay + camera
                     if (ph.landingImpact > 0) {

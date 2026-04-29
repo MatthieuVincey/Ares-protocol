@@ -261,6 +261,35 @@ wss.on('connection', (ws) => {
                 const action = data.action;
                 if (action.playerId !== clientData.playerId) return; // Anti-spoof
                 
+                // --- IMMEDIATE MOVEMENT BROADCAST ---
+                // Send movement directly to others without batching it into STATE_UPDATE to minimize latency
+                if (action.type === 'PLAYER_MOVE') {
+                    // Fast update of server state
+                    const p = room.gameState.players[action.playerId];
+                    if (p) {
+                        p.pos = action.position;
+                        p.rotation = action.rotation;
+                        p.velocity = action.velocity;
+                        p.state = action.state;
+                        if(p.jetpack) p.jetpack.fuel = action.jetpackFuel;
+                    }
+                    
+                    // Broadcast immediately
+                    const movePayload = JSON.stringify({
+                        type: 'PLAYER_MOVED',
+                        action: action
+                    });
+                    
+                    wss.clients.forEach(client => {
+                        const cData = clients.get(client);
+                        if (cData && cData.roomId === clientData.roomId && cData.playerId !== clientData.playerId && client.readyState === WebSocket.OPEN) {
+                            client.send(movePayload);
+                        }
+                    });
+                    
+                    return; // Skip normal applyAction processing
+                }
+
                 applyAction(action, room.gameState);
                 
                 // Active Action Save Trigger (Important Events)
