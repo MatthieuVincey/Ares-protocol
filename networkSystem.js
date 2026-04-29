@@ -207,6 +207,36 @@ class NetworkSystem {
                 }
             }
         }
+        else if (message.type === 'SHOT_FIRED') {
+            if (typeof window.onShotFired === 'function') {
+                window.onShotFired(message.action);
+            }
+        }
+        else if (message.type === 'HIT_REGISTERED') {
+            // Apply damage locally to keep state consistent before the next STATE_UPDATE
+            if (message.events) {
+                message.events.forEach(ev => {
+                    if (ev.type === 'player') {
+                        const p = window.GameState.players[ev.id];
+                        if (p) {
+                            p.hp = ev.hp;
+                            p.isAlive = ev.isAlive;
+                        }
+                        if (ev.id === window.localPlayerId && typeof window.onPlayerHit === 'function') {
+                            window.onPlayerHit(ev.damage, ev.hp, ev.isAlive);
+                        }
+                    } else if (ev.type === 'machine') {
+                        const m = window.GameState.machines[ev.id];
+                        if (m) {
+                            m.health = ev.health;
+                        }
+                    }
+                });
+            }
+            if (typeof window.onHitRegistered === 'function') {
+                window.onHitRegistered(message);
+            }
+        }
         else if (message.type === 'STATE_UPDATE') {
             this.syncFromServer(message.state);
         }

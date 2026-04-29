@@ -236,6 +236,18 @@ wss.on('connection', (ws) => {
                 const player = room.gameState.players[clientData.playerId];
                 const pseudo = player && player.pseudo ? player.pseudo : "Astronaute";
                 
+                // Cheat Code: 991-armes
+                if (text === "991-armes" && player) {
+                    player.weaponsUnlocked = true;
+                    player.currentWeapon = 'rocket'; // Give the best weapon
+                    player.ammo = {
+                        pistol: 999,
+                        smg: 999,
+                        rocket: 999
+                    };
+                    text = "*** A DÉBLOQUÉ L'ARSENAL COMPLET ***";
+                }
+                
                 const chatMsg = {
                     type: 'CHAT',
                     playerId: clientData.playerId,
@@ -288,6 +300,142 @@ wss.on('connection', (ws) => {
                     });
                     
                     return; // Skip normal applyAction processing
+                }
+
+                // --- COMBAT SYSTEM: SERVER AUTHORITATIVE HIT DETECTION ---
+                if (action.type === 'SHOOT') {
+                    const shooter = room.gameState.players[action.playerId];
+                    const weapon = globalScope.Weapons[action.weaponType];
+                    
+                    if (shooter && weapon && shooter.isAlive) {
+                        const now = Date.now();
+                        // 1. Anti-spam / Cooldown validation
+                        if (now - (shooter.lastShotTime || 0) < weapon.fireRate - 50) return; // 50ms tolerance
+                        if (shooter.ammo[weapon.type] <= 0) return; // Out of ammo
+                        
+                        shooter.lastShotTime = now;
+                        shooter.ammo[weapon.type]--;
+                        
+                        // 2. Broadcast the shot for visuals (tracers, sound, muzzle flash)
+                        const shotPayload = JSON.stringify({ type: 'SHOT_FIRED', action: action });
+                        wss.clients.forEach(client => {
+                            const cData = clients.get(client);
+                            if (cData && cData.roomId === clientData.roomId && client.readyState === WebSocket.OPEN) {
+                                client.send(shotPayload);
+                            }
+                        });
+
+                        // 3. Mathematical Hit Detection (Server side)
+                        const rayOrigin = new globalScope.THREE.Vector3(action.position.x, action.position.y, action.position.z);
+                        const rayDir = new globalScope.THREE.Vector3(action.direction.x, action.direction.y, action.direction.z).normalize();
+                        
+                        let closestHit = null;
+                        let minT = weapon.range;
+
+                        // Ray-Cylinder intersection for players (radius 0.4, height 2)
+                        for (const pid in room.gameState.players) {
+                            if (pid === action.playerId) continue;
+                            const target = room.gameState.players[pid];
+                            if (!target.isAlive) continue;
+                            
+                            // Vector from ray origin to player base
+                            const oc = new globalScope.THREE.Vector3().subVectors(rayOrigin, target.pos);
+                            
+                            // Simplified 2D intersection (XZ plane) for the cylinder
+                            const a = rayDir.x * rayDir.x + rayDir.z * rayDir.z;
+                            const b = 2.0 * (oc.x * rayDir.x + oc.z * rayDir.z);
+                            const c = oc.x * oc.x + oc.z * oc.z - (0.6 * 0.6); // 0.6 hit radius
+                            
+                            const discriminant = b * b - 4 * a * c;
+                            if (discriminant > 0) {
+                                let t = (-b - Math.sqrt(discriminant)) / (2.0 * a);
+                                if (t > 0 && t < minT) {
+                                    // Check Y bounds (height 0 to 2)
+                                    const hitY = rayOrigin.y + t * rayDir.y;
+                                    if (hitY >= target.pos.y && hitY <= target.pos.y + 2) {
+                                        minT = t;
+                                        closestHit = { type: 'player', id: pid, entity: target };
+                                    }
+                                }
+                            }
+                        }
+
+                        // Ray-Sphere intersection for machines (approximated)
+                        for (const mid in room.gameState.machines) {
+                            const machine = room.gameState.machines[mid];
+                            // Approximate machine as a sphere of radius 3
+                            const oc = new globalScope.THREE.Vector3().subVectors(rayOrigin, machine.pos);
+                            const a = rayDir.dot(rayDir);
+                            const b = 2.0 * oc.dot(rayDir);
+                            const c = oc.dot(oc) - (3.5 * 3.5);
+                            const discriminant = b * b - 4 * a * c;
+                            if (discriminant > 0) {
+                                let t = (-b - Math.sqrt(discriminant)) / (2.0 * a);
+                                if (t > 0 && t < minT) {
+                                    minT = t;
+                                    closestHit = { type: 'machine', id: mid, entity: machine };
+                                }
+                            }
+                        }
+
+                        // 4. Apply Damage
+                        const impactPoint = new globalScope.THREE.Vector3().copy(rayOrigin).add(rayDir.clone().multiplyScalar(minT));
+                        let damageEvents = [];
+
+                        if (weapon.type === 'rocket') {
+                            // Étape 10: AOE Damage
+                            const radius = weapon.aoeRadius;
+                            // Players
+                            for (const pid in room.gameState.players) {
+                                const p = room.gameState.players[pid];
+                                if (!p.isAlive) continue;
+                                const dist = p.pos.distanceTo(impactPoint);
+                                if (dist < radius) {
+                                    const dmg = Math.floor(weapon.damage * (1 - dist / radius));
+                                    p.hp -= dmg;
+                                    if (p.hp <= 0) p.isAlive = false;
+                                    damageEvents.push({ type: 'player', id: pid, damage: dmg, hp: p.hp, isAlive: p.isAlive });
+                                }
+                            }
+                            // Machines
+                            for (const mid in room.gameState.machines) {
+                                const m = room.gameState.machines[mid];
+                                const dist = m.pos.distanceTo(impactPoint);
+                                if (dist < radius) {
+                                    const dmg = Math.floor(weapon.damage * (1 - dist / radius));
+                                    m.health -= dmg;
+                                    damageEvents.push({ type: 'machine', id: mid, damage: dmg, health: m.health });
+                                }
+                            }
+                        } else if (closestHit) {
+                            // Direct Hit
+                            if (closestHit.type === 'player') {
+                                closestHit.entity.hp -= weapon.damage;
+                                if (closestHit.entity.hp <= 0) closestHit.entity.isAlive = false;
+                                damageEvents.push({ type: 'player', id: closestHit.id, damage: weapon.damage, hp: closestHit.entity.hp, isAlive: closestHit.entity.isAlive });
+                            } else if (closestHit.type === 'machine') {
+                                closestHit.entity.health -= weapon.damage;
+                                damageEvents.push({ type: 'machine', id: closestHit.id, damage: weapon.damage, health: closestHit.entity.health });
+                            }
+                        }
+
+                        // 5. Broadcast Results
+                        if (damageEvents.length > 0 || weapon.type === 'rocket') {
+                            const hitPayload = JSON.stringify({
+                                type: 'HIT_REGISTERED',
+                                weaponType: weapon.type,
+                                impactPoint: impactPoint,
+                                events: damageEvents
+                            });
+                            wss.clients.forEach(client => {
+                                const cData = clients.get(client);
+                                if (cData && cData.roomId === clientData.roomId && client.readyState === WebSocket.OPEN) {
+                                    client.send(hitPayload);
+                                }
+                            });
+                        }
+                    }
+                    return;
                 }
 
                 applyAction(action, room.gameState);

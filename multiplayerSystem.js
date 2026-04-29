@@ -14,6 +14,17 @@ if (typeof globalScope.THREE === 'undefined') {
             constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
             set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; }
             copy(v) { this.x = typeof v.x === 'number' ? v.x : 0; this.y = typeof v.y === 'number' ? v.y : 0; this.z = typeof v.z === 'number' ? v.z : 0; return this; }
+            clone() { return new globalScope.THREE.Vector3(this.x, this.y, this.z); }
+            sub(v) { this.x -= v.x; this.y -= v.y; this.z -= v.z; return this; }
+            subVectors(a, b) { this.x = a.x - b.x; this.y = a.y - b.y; this.z = a.z - b.z; return this; }
+            add(v) { this.x += v.x; this.y += v.y; this.z += v.z; return this; }
+            multiplyScalar(s) { this.x *= s; this.y *= s; this.z *= s; return this; }
+            dot(v) { return this.x * v.x + this.y * v.y + this.z * v.z; }
+            lengthSq() { return this.x * this.x + this.y * this.y + this.z * this.z; }
+            length() { return Math.sqrt(this.lengthSq()); }
+            normalize() { const l = this.length(); return l === 0 ? this : this.multiplyScalar(1 / l); }
+            distanceTo(v) { return Math.sqrt((this.x - v.x) ** 2 + (this.y - v.y) ** 2 + (this.z - v.z) ** 2); }
+            distanceToSquared(v) { return (this.x - v.x) ** 2 + (this.y - v.y) ** 2 + (this.z - v.z) ** 2; }
         },
         Euler: class {
             constructor(x = 0, y = 0, z = 0, order = 'XYZ') { this.x = x; this.y = y; this.z = z; this.order = order; }
@@ -53,6 +64,35 @@ globalScope.GameState = globalScope.createGameState();
 // Unique ID for the current local player
 globalScope.localPlayerId = "player_" + Math.random().toString(36).substr(2, 9);
 
+// Weapons Database
+globalScope.Weapons = {
+    pistol: {
+        type: "pistol",
+        damage: 10,
+        fireRate: 400, // ms between shots
+        maxAmmo: 10,
+        reloadTime: 1500,
+        range: 150
+    },
+    smg: {
+        type: "smg",
+        damage: 6,
+        fireRate: 100,
+        maxAmmo: 30,
+        reloadTime: 2000,
+        range: 100
+    },
+    rocket: {
+        type: "rocket",
+        damage: 100, // AOE max damage
+        fireRate: 2000,
+        maxAmmo: 1,
+        reloadTime: 3000,
+        range: 200,
+        aoeRadius: 15
+    }
+};
+
 // Data structure for players
 globalScope.PlayerData = class PlayerData {
     constructor(id) {
@@ -72,6 +112,17 @@ globalScope.PlayerData = class PlayerData {
         this.state = "idle";
         this.jetpack = { fuel: 100, maxFuel: 100, thrust: 0.16 };
         this.inRoverId = null; // ID of the rover if inside
+        
+        // Combat stats
+        this.isAlive = true;
+        this.weaponsUnlocked = false; // Set to true via cheat code
+        this.currentWeapon = 'pistol';
+        this.ammo = {
+            pistol: globalScope.Weapons.pistol.maxAmmo,
+            smg: globalScope.Weapons.smg.maxAmmo,
+            rocket: globalScope.Weapons.rocket.maxAmmo
+        };
+        this.lastShotTime = 0;
     }
 }
 
@@ -88,6 +139,9 @@ globalScope.MachineData = class MachineData {
             progress: 0,
             storage: {}
         };
+        // Combat stats
+        this.maxHealth = 500;
+        this.health = 500;
     }
 }
 

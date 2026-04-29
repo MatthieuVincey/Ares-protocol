@@ -995,6 +995,16 @@
         <button class="close-btn" id="tech-close" style="margin-top:16px">FERMER [T]</button>
     </div>
 
+    <!-- Combat HUD -->
+    <div id="combat-ui" style="display:none; position: absolute; bottom: 20px; right: 20px; text-align: right; pointer-events: none; z-index: 100;">
+        <div style="font-size: 28px; font-weight: 900; color: #ff4444; text-shadow: 0 0 10px rgba(255,0,0,0.8); background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 8px;">
+            ❤️ <span id="combat-hp">100</span>
+        </div>
+        <div style="font-size: 20px; font-weight: bold; color: #ffaa00; text-shadow: 0 0 10px rgba(255,170,0,0.5); margin-top: 8px; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 8px;">
+            🔫 <span id="combat-weapon">PISTOL</span> | <span id="combat-ammo">10</span>
+        </div>
+    </div>
+
     <!-- Chat System (Restored static for maximum reliability) -->
     <div id="chat-container" style="position: fixed; bottom: 85px; left: 16px; width: 320px; height: 180px; display: flex !important; flex-direction: column; background: rgba(0,0,0,0.7); border: 1px solid rgba(0,212,255,0.5); border-radius: 6px; overflow: hidden; pointer-events: auto; opacity: 1 !important; z-index: 999999; backdrop-filter: blur(8px);">
         <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 8px; font-size: 12px; font-family: monospace; display: flex; flex-direction: column; gap: 4px; color: #fff; text-shadow: 1px 1px 2px #000;">
@@ -3376,6 +3386,7 @@
             // Unify PointerLock check to document.body
             if (e.button === 0 && document.pointerLockElement === document.body) {
                 if (state.placing) confirmPlace();
+                else if (state.player.weaponsUnlocked) tryShoot();
                 else if (typeof tryInteract === 'function') tryInteract();
             }
         });
@@ -3714,6 +3725,145 @@
             showMsg("Rien à portée (appuyez sur E face à une ressource ou machine)");
         }
 
+        // ================= COMBAT SYSTEM =================
+        function tryShoot() {
+            if (!state.player.isAlive || !state.player.weaponsUnlocked) return;
+            const weaponId = state.player.currentWeapon;
+            const weapon = window.Weapons ? window.Weapons[weaponId] : null;
+            if (!weapon) return;
+            
+            if (!state.player.ammo) state.player.ammo = { pistol: 10, smg: 30, rocket: 1 };
+            
+            const now = Date.now();
+            if (now - (state.player.lastShotTime || 0) < weapon.fireRate) return; // Cooldown
+            if (state.player.ammo[weaponId] <= 0) {
+                showMsg("Plus de munitions !");
+                return;
+            }
+
+            state.player.lastShotTime = now;
+            state.player.ammo[weaponId]--;
+
+            const viewDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+            
+            // Local visual feedback
+            window.onShotFired({
+                playerId: window.localPlayerId,
+                weaponType: weaponId,
+                position: state.player.pos,
+                direction: viewDir
+            });
+
+            // Send to server
+            window.sendAction({
+                type: 'SHOOT',
+                playerId: window.localPlayerId,
+                weaponType: weaponId,
+                position: state.player.pos,
+                direction: viewDir
+            });
+            return true;
+        }
+
+        window.onShotFired = function(action) {
+            // Visualize shot (tracers/muzzle flash)
+            const origin = action.position.clone();
+            if (action.playerId === window.localPlayerId) {
+                // If it's local player, originate from camera slightly offset
+                origin.copy(camera.position).add(new THREE.Vector3(0.5, -0.3, -0.5).applyQuaternion(camera.quaternion));
+            } else {
+                origin.y += 1.5; // Remote player chest height
+            }
+
+            const dir = new THREE.Vector3(action.direction.x, action.direction.y, action.direction.z).normalize();
+            
+            if (action.weaponType === 'rocket') {
+                // Visualize slow rocket
+                const rocket = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.5), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+                rocket.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                rocket.position.copy(origin);
+                scene.add(rocket);
+                // Simple animation loop for rocket
+                let flightTime = 0;
+                const animateRocket = () => {
+                    flightTime += 16;
+                    if (flightTime > 2000) { scene.remove(rocket); return; }
+                    rocket.position.add(dir.clone().multiplyScalar(1.0)); // Speed 60m/s
+                    requestAnimationFrame(animateRocket);
+                };
+                animateRocket();
+            } else {
+                // Visualize tracer line
+                const end = origin.clone().add(dir.clone().multiplyScalar(50));
+                const mat = new THREE.LineBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.8 });
+                const geo = new THREE.BufferGeometry().setFromPoints([origin, end]);
+                const line = new THREE.Line(geo, mat);
+                scene.add(line);
+                
+                // Muzzle flash light
+                const flash = new THREE.PointLight(0xffffaa, 2, 5);
+                flash.position.copy(origin);
+                scene.add(flash);
+                
+                setTimeout(() => {
+                    scene.remove(line);
+                    scene.remove(flash);
+                }, 50);
+            }
+        };
+
+        window.onHitRegistered = function(message) {
+            // Visual feedback for hits
+            const pt = message.impactPoint;
+            if (pt) {
+                // Explosion / Impact particles
+                const color = message.weaponType === 'rocket' ? 0xff4400 : 0xffffaa;
+                const radius = message.weaponType === 'rocket' ? 15 : 1;
+                
+                const flash = new THREE.PointLight(color, radius > 1 ? 5 : 2, radius * 2);
+                flash.position.copy(pt);
+                scene.add(flash);
+                
+                // Impact sphere
+                const mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.8 });
+                const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius > 1 ? radius : 0.2, 16, 16), mat);
+                mesh.position.copy(pt);
+                scene.add(mesh);
+
+                let fade = 1.0;
+                const animateImpact = () => {
+                    fade -= 0.05;
+                    if (fade <= 0) {
+                        scene.remove(flash);
+                        scene.remove(mesh);
+                        return;
+                    }
+                    mat.opacity = fade;
+                    if (radius > 1) mesh.scale.setScalar(1 + (1 - fade));
+                    requestAnimationFrame(animateImpact);
+                };
+                animateImpact();
+            }
+        };
+
+        window.onPlayerHit = function(damage, hp, isAlive) {
+            // Screen flash red when hit
+            const overlay = document.createElement('div');
+            overlay.style.position = 'fixed';
+            overlay.style.top = '0'; overlay.style.left = '0';
+            overlay.style.width = '100%'; overlay.style.height = '100%';
+            overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.4)';
+            overlay.style.pointerEvents = 'none';
+            overlay.style.zIndex = '999999';
+            document.body.appendChild(overlay);
+            
+            setTimeout(() => {
+                overlay.style.transition = 'opacity 0.2s';
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.remove(), 200);
+            }, 50);
+        };
+
         // ============================================================
         //  Terraforming Engine
         // ============================================================
@@ -3840,9 +3990,18 @@
                     // Stop extracting if local storage is full
                     if (b.userData.localInventory >= bd.maxStorage) continue;
 
-                    // Advance timer based on delta time and energy ratio
+                    // Calculate machine health multiplier (Step 9)
+                    const machineId = b.userData.machineId;
+                    const syncMachine = state.machines ? state.machines[machineId] : null;
+                    let healthRatio = 1.0;
+                    if (syncMachine && syncMachine.health !== undefined && syncMachine.maxHealth) {
+                        healthRatio = Math.max(0, syncMachine.health / syncMachine.maxHealth);
+                    }
+                    if (healthRatio === 0) continue; // Machine is destroyed/stopped
+
+                    // Advance timer based on delta time, energy ratio, and health
                     const efficientMult = 1.0 + (state.upgrades.drill_efficiency * 0.25); // +25% per level
-                    b.userData.extractTimer += dt * ratio * efficientMult;
+                    b.userData.extractTimer += dt * ratio * efficientMult * healthRatio;
 
                     if (b.userData.extractTimer >= bd.rate) {
                         b.userData.extractTimer -= bd.rate;
@@ -4459,6 +4618,15 @@
 
                 // --- Ghost ---
                 updateGhost();
+
+                // --- Combat UI Update ---
+                if (state.player.weaponsUnlocked) {
+                    const cui = document.getElementById('combat-ui');
+                    if (cui && cui.style.display === 'none') cui.style.display = 'block';
+                    document.getElementById('combat-hp').innerText = Math.floor(state.player.hp);
+                    document.getElementById('combat-weapon').innerText = state.player.currentWeapon.toUpperCase();
+                    document.getElementById('combat-ammo').innerText = state.player.ammo ? state.player.ammo[state.player.currentWeapon] : 0;
+                }
 
                 // --- Stats ---
                 const distFromCenter = Math.sqrt(state.player.pos.x ** 2 + state.player.pos.z ** 2);
