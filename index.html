@@ -2385,7 +2385,7 @@
         const textureLoader = new THREE.TextureLoader();
 
         function addLargePhotoToGroup(group, url, pos, rot) {
-            const pMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 }); // Start hidden
+            const pMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide }); // Start hidden
             const photo = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), pMat);
             photo.position.set(...pos);
             photo.rotation.y = rot;
@@ -2501,9 +2501,9 @@
                 group.add(wg);
                 group.userData = { btype: type, wallsGroup: wg };
 
-                if (type === 'shelter' || type === 'maison_close') {
+                if (type === 'shelter' || type === 'maison_close' || type === 'cheat_module') {
                     let wN, wS, wE, wW;
-                    if (type === 'maison_close') {
+                    if (type === 'maison_close' || type === 'cheat_module') {
                         // Secret Module: Only one door (South), others are solid for photos
                         wN = makeSolidWall(wallColor, isGhost);
                         wS = makeWall(wallColor, isGhost); // Door
@@ -2523,7 +2523,7 @@
                     wg.add(wN, wS, wE, wW);
                     if (!isGhost) [wN, wS, wE, wW].forEach(w => w.children.forEach(c => state.wallColliders.push(c)));
 
-                    if (type === 'maison_close' && !isGhost) {
+                    if ((type === 'maison_close' || type === 'cheat_module') && !isGhost) {
                         // Photo 1 (Mur Nord)
                         addLargePhotoToGroup(group, 'photo1.jpg', [0, 3, -4.75], 0);
                         // Photo 2 (Mur Est)
