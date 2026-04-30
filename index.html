@@ -2409,7 +2409,17 @@
         const textureLoader = new THREE.TextureLoader();
 
         function addLargePhotoToGroup(group, url, pos, rot) {
-            const pMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide }); // Start hidden
+            // Use polygonOffset to prevent any z-fighting with the wall. 
+            // Also depthWrite: false prevents transparent planes from sorting incorrectly against each other.
+            const pMat = new THREE.MeshBasicMaterial({ 
+                transparent: true, 
+                opacity: 0, 
+                side: THREE.DoubleSide,
+                depthWrite: false,
+                polygonOffset: true,
+                polygonOffsetFactor: -4,
+                polygonOffsetUnits: -4
+            });
             const photo = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), pMat);
             photo.position.set(...pos);
             photo.rotation.y = rot;
@@ -2417,7 +2427,8 @@
 
             textureLoader.load(url, (tex) => {
                 const aspect = tex.image.width / tex.image.height;
-                const maxWidth = 9.2;
+                // Max width reduced to 8.6 to prevent corners from intersecting with adjacent wall ribs
+                const maxWidth = 8.6;
                 const maxHeight = 5.4;
                 
                 let w = maxWidth;
