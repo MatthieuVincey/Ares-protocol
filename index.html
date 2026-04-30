@@ -2550,12 +2550,12 @@
                     if (!isGhost) [wN, wS, wE, wW].forEach(w => w.children.forEach(c => state.wallColliders.push(c)));
 
                     if ((type === 'maison_close' || type === 'cheat_module') && !isGhost) {
-                        // Photo 1 (Mur Nord) - Mur à z=-4.8, surface intérieure à -4.6
-                        addLargePhotoToGroup(group, 'photo1.jpg', [0, 3, -4.55], 0);
-                        // Photo 2 (Mur Est) - Mur à x=4.8, surface intérieure à 4.6
-                        addLargePhotoToGroup(group, 'photo2.jpg', [4.55, 3, 0], -Math.PI / 2);
-                        // Photo 3 (Mur Ouest) - Mur à x=-4.8, surface intérieure à -4.6
-                        addLargePhotoToGroup(group, 'photo3.jpg', [-4.55, 3, 0], Math.PI / 2);
+                        // Photo 1 (Mur Nord) - Mur à z=-4.8, inner rib boundary is at -4.45, so use -4.4
+                        addLargePhotoToGroup(group, 'photo1.jpg', [0, 3, -4.4], 0);
+                        // Photo 2 (Mur Est) - Mur à x=4.8, inner rib boundary is at 4.45, so use 4.4
+                        addLargePhotoToGroup(group, 'photo2.jpg', [4.4, 3, 0], -Math.PI / 2);
+                        // Photo 3 (Mur Ouest) - Mur à x=-4.8, inner rib boundary is at -4.45, so use -4.4
+                        addLargePhotoToGroup(group, 'photo3.jpg', [-4.4, 3, 0], Math.PI / 2);
                     }
                 } else {
                     const wN = makeSolidWall(wallColor, isGhost); wN.position.z = -4.8;
