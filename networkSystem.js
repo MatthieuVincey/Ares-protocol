@@ -286,6 +286,9 @@ class NetworkSystem {
             p.hp = sp.hp; p.o2 = sp.o2; p.energy = sp.energy;
             p.state = sp.state;
             p.inventory = sp.inventory || {};
+            p.weaponsUnlocked = sp.weaponsUnlocked;
+            p.infiniteAmmo = sp.infiniteAmmo;
+            if (sp.ammo) p.ammo = Object.assign({}, sp.ammo);
             if (sp.jetpack) p.jetpack = sp.jetpack;
             window.GameState.players[id] = p;
         }
@@ -316,6 +319,11 @@ class NetworkSystem {
             lp.energy = sp.energy;
             lp.state = sp.state;
             if (sp.jetpack) lp.jetpack.fuel = sp.jetpack.fuel;
+            
+            // Sync weapon unlock and ammo state
+            if (sp.weaponsUnlocked !== undefined) lp.weaponsUnlocked = sp.weaponsUnlocked;
+            if (sp.infiniteAmmo !== undefined) lp.infiniteAmmo = sp.infiniteAmmo;
+            if (sp.ammo) lp.ammo = Object.assign({}, sp.ammo);
             
             if (id === window.localPlayerId) {
                 // LOCAL PLAYER: Trust client-side predicted position/rotation. 

@@ -3780,13 +3780,13 @@
             
             const now = Date.now();
             if (now - (state.player.lastShotTime || 0) < weapon.fireRate) return; // Cooldown
-            if (state.player.ammo[weaponId] <= 0) {
+            if (!state.player.infiniteAmmo && state.player.ammo[weaponId] <= 0) {
                 showMsg("Plus de munitions !");
                 return;
             }
 
             state.player.lastShotTime = now;
-            state.player.ammo[weaponId]--;
+            if (!state.player.infiniteAmmo) state.player.ammo[weaponId]--;
 
             const viewDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
             
@@ -4670,9 +4670,10 @@
                     document.getElementById('combat-hp').innerText = Math.floor(state.player.hp);
                     
                     if (state.player.ammo) {
-                        document.getElementById('ammo-pistol').innerText = state.player.ammo.pistol || 0;
-                        document.getElementById('ammo-smg').innerText = state.player.ammo.smg || 0;
-                        document.getElementById('ammo-rocket').innerText = state.player.ammo.rocket || 0;
+                        const inf = state.player.infiniteAmmo;
+                        document.getElementById('ammo-pistol').innerText = inf ? '∞' : (state.player.ammo.pistol || 0);
+                        document.getElementById('ammo-smg').innerText = inf ? '∞' : (state.player.ammo.smg || 0);
+                        document.getElementById('ammo-rocket').innerText = inf ? '∞' : (state.player.ammo.rocket || 0);
                     }
                     
                     ['pistol', 'smg', 'rocket'].forEach(w => {

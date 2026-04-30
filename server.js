@@ -248,6 +248,12 @@ wss.on('connection', (ws) => {
                     text = "*** A DÉBLOQUÉ L'ARSENAL COMPLET ***";
                 }
                 
+                // Cheat Code: 991-ammo
+                if (text === "991-ammo" && player) {
+                    player.infiniteAmmo = true;
+                    text = "*** MUNITIONS INFINIES ACTIVÉES ***";
+                }
+                
                 const chatMsg = {
                     type: 'CHAT',
                     playerId: clientData.playerId,
@@ -311,10 +317,10 @@ wss.on('connection', (ws) => {
                         const now = Date.now();
                         // 1. Anti-spam / Cooldown validation
                         if (now - (shooter.lastShotTime || 0) < weapon.fireRate - 50) return; // 50ms tolerance
-                        if (shooter.ammo[weapon.type] <= 0) return; // Out of ammo
+                        if (!shooter.infiniteAmmo && shooter.ammo[weapon.type] <= 0) return; // Out of ammo
                         
                         shooter.lastShotTime = now;
-                        shooter.ammo[weapon.type]--;
+                        if (!shooter.infiniteAmmo) shooter.ammo[weapon.type]--;
                         
                         // 2. Broadcast the shot for visuals (tracers, sound, muzzle flash)
                         const shotPayload = JSON.stringify({ type: 'SHOT_FIRED', action: action });
