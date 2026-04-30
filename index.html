@@ -3405,12 +3405,19 @@
 
         document.addEventListener('mousedown', e => {
             if (!state.started) return;
+            // Track mouse state for automatic weapons
+            if (e.button === 0) state.isMouseDown = true;
+            
             // Unify PointerLock check to document.body
             if (e.button === 0 && document.pointerLockElement === document.body) {
                 if (state.placing) confirmPlace();
                 else if (state.player.weaponsUnlocked) tryShoot();
                 else if (typeof tryInteract === 'function') tryInteract();
             }
+        });
+
+        document.addEventListener('mouseup', e => {
+            if (e.button === 0) state.isMouseDown = false;
         });
 
         // ================= ROOM LOBBY LOGIC =================
@@ -4663,8 +4670,13 @@
                 // --- Ghost ---
                 updateGhost();
 
-                // --- Combat UI Update ---
+                // --- Combat UI & Rapid Fire ---
                 if (state.player.weaponsUnlocked) {
+                    // SMG Rapid Fire Logic
+                    if (state.isMouseDown && state.player.currentWeapon === 'smg' && document.pointerLockElement === document.body) {
+                        tryShoot();
+                    }
+
                     const cui = document.getElementById('combat-ui');
                     if (cui && cui.style.display === 'none') cui.style.display = 'block';
                     document.getElementById('combat-hp').innerText = Math.floor(state.player.hp);
