@@ -4746,9 +4746,28 @@
                     const ds = document.getElementById('death-screen');
                     if (ds) ds.style.display = 'flex';
                     
-                    // Delay respawn
+                    // Delay respawn (5 seconds)
                     setTimeout(() => {
-                        state.player.pos.set(0, getTerrainY(0, 0) + 50, 0);
+                        let spawnX = 0;
+                        let spawnZ = 0;
+                        let closestDist = Infinity;
+                        
+                        // Find closest alive player to origin
+                        for (const id in state.players) {
+                            if (id === window.localPlayerId) continue;
+                            const p = state.players[id];
+                            if (p && p.hp > 0 && p.isAlive !== false) {
+                                const distToCenter = Math.sqrt(p.pos.x ** 2 + p.pos.z ** 2);
+                                if (distToCenter < closestDist) {
+                                    closestDist = distToCenter;
+                                    const angle = Math.random() * Math.PI * 2;
+                                    spawnX = p.pos.x + Math.cos(angle) * 5;
+                                    spawnZ = p.pos.z + Math.sin(angle) * 5;
+                                }
+                            }
+                        }
+
+                        state.player.pos.set(spawnX, getTerrainY(spawnX, spawnZ) + 50, spawnZ);
                         state.physics.velY = 0;
                         state._isDead = false;
                         if (ds) ds.style.display = 'none';
@@ -4761,7 +4780,7 @@
                             hp: 100
                         });
                         showMsg("Séquence de survie réinitialisée");
-                    }, 3000);
+                    }, 5000);
                 }
 
                 // --- Automated Extraction & Drones ---
