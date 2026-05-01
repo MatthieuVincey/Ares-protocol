@@ -1353,8 +1353,8 @@
             // Bases (Modules)
             shelter: { label: 'Sas Habitat', color: 0x99aacc, isModule: true, cost: { Fer: 20, Aluminium: 10 }, footprint: 10 },
             serre: { label: 'Serre', color: 0x88ff88, isModule: true, cost: { Fer: 10, Silicium: 10, Eau: 10 }, footprint: 10, requiredTech: 'greenhouse_auto' },
-            maison_close: { label: 'Maison Close', color: 0xffaa00, isModule: true, cost: {}, footprint: 10, hidden: true },
-            cheat_module: { label: 'Maison Close (Legacy)', color: 0xffaa00, isModule: true, cost: {}, footprint: 10, hidden: true },
+            maison_close: { label: 'Bar à pute', color: 0xffaa00, isModule: true, cost: {}, footprint: 10, hidden: true },
+            cheat_module: { label: 'Bar à pute (Legacy)', color: 0xffaa00, isModule: true, cost: {}, footprint: 10, hidden: true },
         };
         //  Game State (Bridged to GameState for incremental refactor)
         // ============================================================
@@ -2421,6 +2421,7 @@
                 polygonOffsetUnits: -4
             });
             const photo = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), pMat);
+            photo.userData.isPhoto = true;
             photo.position.set(...pos);
             photo.rotation.y = rot;
             group.add(photo);
@@ -3463,7 +3464,7 @@
                 chatInput.value = '';
                 if (!val) return;
                 if (val === '991-18') {
-                    window.appendChatMessage({ pseudo: 'SYSTÈME', playerId: 'system', message: '✅ Maison Close prête à être bâtie !' });
+                    window.appendChatMessage({ pseudo: 'SYSTÈME', playerId: 'system', message: '✅ Bar à pute prêt à être bâti !' });
                     if (typeof startPlacing === 'function') startPlacing('maison_close');
                 } else if (state && state.networkSystem) {
                     state.networkSystem.sendChat(val);
@@ -4882,7 +4883,9 @@
                     if (drill) drill.position.y = 1 + Math.sin(time * 5) * 0.2;
                 }
                 b.traverse(c => {
-                    if (c.material && c.material.type === 'MeshBasicMaterial') c.material.opacity = 0.6 + Math.sin(time * 8) * 0.4;
+                    if (c.material && c.material.type === 'MeshBasicMaterial' && !c.userData.isPhoto) {
+                        c.material.opacity = 0.6 + Math.sin(time * 8) * 0.4;
+                    }
                 });
                 if (b.userData.isMonument) {
                     b.children.forEach(c => {
