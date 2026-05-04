@@ -794,23 +794,7 @@
             margin: 0 10px;
         }
 
-        /* ===== HUD Room Info ===== */
-        #hud-room-info {
-            position: absolute;
-            top: 16px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.6);
-            border: 1px solid rgba(0, 212, 255, 0.4);
-            border-radius: 6px;
-            padding: 8px 16px;
-            font-size: 13px;
-            color: #00d4ff;
-            letter-spacing: 2px;
-            text-align: center;
-            display: none;
-            backdrop-filter: blur(4px);
-        }
+        /* ===== HUD Room Info (REMOVED) ===== */
         #upgrade-panel {
             position: fixed;
             top: 50%;
@@ -945,12 +929,7 @@
         <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; max-width: 300px;">
             <input type="text" id="player-pseudo" placeholder="Votre pseudonyme..." maxlength="16" autocomplete="off" />
             
-            <button class="start-btn" id="create-btn">🛠️ CRÉER UNE PARTIE</button>
-            
-            <div class="room-divider">OU REJOINDRE</div>
-            
-            <input type="text" id="room-code-input" placeholder="CODE DU SALON" maxlength="6" style="text-transform: uppercase; text-align: center; font-weight: bold; font-family: monospace; letter-spacing: 4px; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.2); color: #fff; padding: 10px; border-radius: 4px; width: 100%; outline: none;" />
-            <button class="start-btn" id="join-btn" style="border-color: #00d4ff; color: #00d4ff;">🚀 REJOINDRE</button>
+            <button class="start-btn" id="play-btn">ENTRER DANS LE MONDE</button>
             
             <div id="room-error" style="color: #ff4444; font-size: 12px; height: 14px; margin-top: 5px;"></div>
         </div>
@@ -1029,11 +1008,7 @@
         </div>
     </div>
     <div id="hud">
-        <!-- Room Info (HUD) -->
-        <div id="hud-room-info" style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); border: 1px solid rgba(0,212,255,0.4); border-radius: 6px; padding: 8px 16px; font-size: 13px; color: #00d4ff; letter-spacing: 2px; text-align: center; display: none; backdrop-filter: blur(4px);">
-            ID SALON: <span id="hud-room-code" style="font-weight: bold; color: #fff;">------</span>
-        </div>
-
+        <!-- Persistent World -->
 
         <!-- Biome Info -->
         <div id="biome-info">
@@ -3488,7 +3463,6 @@
             // 1. PRIORITIZE UI VISIBILITY (Hiding title screen FIRST)
             document.getElementById('title-screen').style.display = 'none';
             document.getElementById('hud').style.display = 'block';
-            document.getElementById('hud-room-info').style.display = 'block';
 
             // 2. RENDRE LE CHAT VISIBLE (il est déjà dans le DOM, on s'assure juste qu'il est visible)
             const chatContainer = document.getElementById('chat-container');
@@ -3520,9 +3494,7 @@
             showMsg("Bienvenue sur ARES. (Appuyez sur Entrée pour le chat)");
         }
 
-        window.onRoomJoined = (roomId) => {
-            document.getElementById('hud-room-code').textContent = roomId;
-            // The localNetworkSystem has already set window.localPlayerPseudo
+        window.onWorldJoined = () => {
             finalizeStartSequence();
         };
 
@@ -3531,45 +3503,21 @@
             setTimeout(() => document.getElementById('room-error').textContent = '', 3000);
         };
 
-        document.getElementById('create-btn').addEventListener('click', () => {
+        document.getElementById('play-btn').addEventListener('click', () => {
             try {
                 const pseudoInput = document.getElementById('player-pseudo').value.trim();
                 window.localPlayerPseudo = pseudoInput.length > 0 ? pseudoInput : "Astronaute";
                 
                 const net = window.state ? window.state.networkSystem : null;
                 if (net && net.connected) {
-                    document.getElementById('create-btn').textContent = "CRÉATION...";
-                    net.createRoom();
+                    document.getElementById('play-btn').textContent = "CONNEXION...";
+                    net.joinWorld(window.localPlayerPseudo);
                 } else {
-                    console.log("Create click failed: ", { netExists: !!net, connected: net ? net.connected : 'N/A' });
+                    console.log("Play click failed: ", { netExists: !!net, connected: net ? net.connected : 'N/A' });
                     document.getElementById('room-error').textContent = "Serveur non connecté...";
                 }
             } catch (err) {
-                console.error("Create Button Error:", err);
-            }
-        });
-        
-        document.getElementById('join-btn').addEventListener('click', () => {
-            try {
-                const roomCode = document.getElementById('room-code-input').value.trim();
-                if (roomCode.length === 0) {
-                    document.getElementById('room-error').textContent = "Entrez un code !";
-                    return;
-                }
-                
-                const pseudoInput = document.getElementById('player-pseudo').value.trim();
-                window.localPlayerPseudo = pseudoInput.length > 0 ? pseudoInput : "Astronaute";
-                
-                const net = window.state ? window.state.networkSystem : null;
-                if (net && net.connected) {
-                    document.getElementById('join-btn').textContent = "CONNEXION...";
-                    net.joinRoom(roomCode);
-                } else {
-                    console.log("Join click failed: ", { netExists: !!net, connected: net ? net.connected : 'N/A' });
-                    document.getElementById('room-error').textContent = "Serveur non connecté...";
-                }
-            } catch (err) {
-                console.error("Join Button Error:", err);
+                console.error("Play Button Error:", err);
             }
         });
 
