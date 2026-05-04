@@ -148,6 +148,7 @@ class RoverSystem {
         else if (rType.includes('arms')) this._buildArmsVisuals(vehicle, specs, panelMat, frameMat, detailMat, emitMat);
         else if (rType.includes('volic')) this._buildVolicVisuals(vehicle, specs, panelMat, frameMat, detailMat, emitMat);
         else if (rType.includes('planet')) this._buildPlanetVisuals(vehicle, specs, panelMat, frameMat, detailMat, emitMat);
+        else if (rType.includes('auguste')) this._buildAugusteVisuals(vehicle, specs, panelMat, frameMat, detailMat, emitMat);
         else {
             const pod = new THREE.Mesh(new THREE.BoxGeometry(specs.w-0.4, 1.2, specs.l*0.6), panelMat);
             pod.position.y = frame.position.y + 0.8;
@@ -455,6 +456,57 @@ class RoverSystem {
         });
     }
 
+    _buildAugusteVisuals(vehicle, specs, panelMat, frameMat, detailMat, emitMat) {
+        const hull = new THREE.Mesh(new THREE.BoxGeometry(specs.w-0.6, 0.6, specs.l), panelMat);
+        hull.position.y = specs.wheelRadius + specs.suspensionLength + 0.3;
+        vehicle.add(hull);
+
+        // Load the custom face image
+        const texLoader = new THREE.TextureLoader();
+        texLoader.load('auguste.png', (tex) => {
+            const faceAspect = tex.image.width / tex.image.height;
+            const faceHeight = 2.0; // Make it big enough
+            const faceWidth = faceHeight * faceAspect;
+            
+            const faceMat = new THREE.MeshBasicMaterial({ 
+                map: tex, 
+                transparent: true, 
+                side: THREE.DoubleSide,
+                alphaTest: 0.1 // Important for clean transparent edges
+            });
+            const faceMesh = new THREE.Mesh(new THREE.PlaneGeometry(faceWidth, faceHeight), faceMat);
+            // Position at the front of the vehicle
+            faceMesh.position.set(0, 0.8, specs.l*0.5 + 0.05); 
+            // Slight tilt back
+            faceMesh.rotation.x = -0.1;
+            hull.add(faceMesh);
+        });
+
+        // Aerodynamic Cockpit (kept for structure)
+        const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 12), new THREE.MeshStandardMaterial({color: 0x222222, metalness: 1, roughness: 0.1}));
+        cockpit.scale.set(1.2, 0.8, 2.0);
+        cockpit.position.set(0, 0.3, 0.2);
+        hull.add(cockpit);
+
+        // Rear Spoiler (Double Deck)
+        const strut = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.6, 0.2), detailMat);
+        strut.position.set(0, 0.3, -specs.l*0.4);
+        hull.add(strut);
+        
+        [ 0.3, 0.5 ].forEach(height => {
+            const wing = new THREE.Mesh(new THREE.BoxGeometry(specs.w+0.2, 0.05, 0.6), frameMat);
+            wing.position.set(0, height, -specs.l*0.4);
+            hull.add(wing);
+        });
+
+        // Side Intakes
+        [ -1, 1 ].forEach(side => {
+            const intake = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 0.8), detailMat);
+            intake.position.set(side * (specs.w*0.4), 0, 0);
+            hull.add(intake);
+        });
+    }
+
     _buildWheels(vehicle, specs, type, frameMat, wheelMat) {
         const positions = this._wheelLayout(specs, type);
         const suspArms = [];
@@ -604,6 +656,7 @@ class RoverSystem {
         if (t.includes('arms'))   return { ...base, label:'Unité de Maintenance', color:0x888888, maxSpeed:13.0, accel:16.0, w:2.6, l:5.0, maxEnergy:1800, energyDrain:4.5 };
         if (t.includes('volic'))  return { ...base, label:'Hovercraft Volique', color:0x55aaff, maxSpeed:22.0, accel:28.0, w:2.5, l:4.5, maxEnergy:1500, energyDrain:7.0, gravity:10.0 };
         if (t.includes('planet')) return { ...base, label:'Explorateur Planétaire', color:0xffffff, maxSpeed:14.0, accel:15.0, w:3.0, l:6.5, maxEnergy:3000, energyDrain:5.0 };
+        if (t.includes('auguste')) return { ...base, label:'Rover Auguste', color:0xffcc00, maxSpeed:28.0, accel:40.0, w:2.1, l:4.2, maxEnergy:800, energyDrain:5.0 };
         
         return { ...base, label:'Rover Standard', color:0xaaaaaa, maxSpeed:15, accel:18, w:2.2, l:4.0, maxEnergy:1000 };
     }

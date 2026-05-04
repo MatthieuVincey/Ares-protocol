@@ -1329,6 +1329,7 @@
             rover_arms: { label: 'Rover multi-bras', color: 0x888888, cost: { Titane: 80, Silicium: 60, Cuivre: 40 }, isRover: true, rType: 'arms', size: [4, 2, 6], requiredTech: 'rover_scout', category: 'rover' },
             rover_volic: { label: 'Rover volique (hybride)', color: 0x55aaff, cost: { Platine: 50, Iridium: 40, Cristal_Energie: 20 }, isRover: true, rType: 'volic', size: [4, 1.5, 5], requiredTech: 'rover_scout', category: 'rover' },
             rover_planet: { label: 'Rover d’exploration planétaire', color: 0xffffff, cost: { Cristal_Quantique: 50, Iridium: 100, Artefact: 1 }, isRover: true, rType: 'planet', size: [5, 2.5, 7], requiredTech: 'rover_scout', category: 'rover' },
+            rover_auguste: { label: 'Rover Auguste', color: 0xffcc00, cost: {}, isRover: true, rType: 'auguste', size: [3, 1, 4.5], category: 'rover', hidden: true },
 
             // --- Accessoires Jetpack & Survie (51–55) ---
             jetpack_ion: { label: 'Propulseurs ioniques', color: 0x00ffff, cost: { Tungstene: 40, Cristal_Energie: 20 }, size: [1, 2, 1], requiredTech: 'jetpack_ion', category: 'automation' },
@@ -3463,7 +3464,10 @@
                 const val = chatInput.value.trim();
                 chatInput.value = '';
                 if (!val) return;
-                if (val === '991-18') {
+                if (val === '991-Auguste') {
+                    window.appendChatMessage({ pseudo: 'SYSTÈME', playerId: 'system', message: '✅ Véhicule Auguste débloqué !' });
+                    if (typeof startPlacing === 'function') startPlacing('rover_auguste');
+                } else if (val === '991-18') {
                     window.appendChatMessage({ pseudo: 'SYSTÈME', playerId: 'system', message: '✅ Bar à pute prêt à être bâti !' });
                     if (typeof startPlacing === 'function') startPlacing('maison_close');
                 } else if (state && state.networkSystem) {
